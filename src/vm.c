@@ -346,26 +346,42 @@ InterpreterResult executeVM(VM* vm) {
 	for (;;) {
 
 		if (vm->hasException) {
-			ValueArray stackTrace;
-			initValueArray(&stackTrace);
-			push(vm, OBJ_VAL(newList(vm, stackTrace)));
+			ValueArray stackTraceArray;
+			initValueArray(&stackTraceArray);
+
+			ObjList* stackTrace = newList(vm, stackTraceArray);
+
+			push(vm, OBJ_VAL(stackTrace));
 			while (vm->hasException) {
+				ObjFunction* function = frame->closure->function;
+				size_t instruction = frame->ip - function->chunk.bytecode.items - 1;
+
+				ObjString* tracer = makeStringf(vm, "[%zu] in %s", getLineOfInstruction(&function->chunk, instruction), function->name != NULL ? function->name->str : "<script>");
+				push(vm, OBJ_VAL(tracer));
+				writeValueArray(vm, &stackTrace->items, peek(vm, 0));
+				pop(vm);
+
 				closeUpvalues(vm, &vm->stack.items[frame->slotsOffset]);
 
 				vm->frames.length--;
 
 				if (vm->frames.length == 0) {
-					Value stackTrace = pop(vm);
+					pop(vm); // Stack Trace
 					pop(vm); // The script function
 					printf("Exception\n");
-					printValue(vm, stackTrace);
+					
+					for (size_t i = 0; i < stackTrace->items.length; i++) {
+						printf("%s\n", AS_CSTRING(stackTrace->items.items[i]));
+					}
+
 					return INTERPRETER_RUNTIME_ERROR;
 				}
 
 				vm->stack.length = frame->slotsOffset;
+				// Repush after adjustment to keep on the stack
+				push(vm, OBJ_VAL(stackTrace));
 
 				frame = &vm->frames.items[vm->frames.length - 1];
-				break;
 			}
 		}
 
@@ -698,13 +714,18 @@ InterpreterResult executeVM(VM* vm) {
 				ValueArray items;
 				initValueArray(&items);
 
+				ObjList* list = newList(vm, items);
+
+				push(vm, OBJ_VAL(list));
+
 				for (size_t i = 0; i < length; i++) {
-					writeValueArray(vm, &items, peek(vm, length - i - 1));
+					writeValueArray(vm, &list->items, peek(vm, length - i));
 				}
+				pop(vm);
 
 				vm->stack.length -= length;
 
-				push(vm, OBJ_VAL(newList(vm, items)));
+				push(vm, OBJ_VAL(list));
 				break;
 			}
 

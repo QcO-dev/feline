@@ -104,6 +104,8 @@ ObjList* newList(VM* vm, ValueArray items);
 
 ObjString* copyString(VM* vm, const char* str, size_t length);
 ObjString* takeString(VM* vm, char* str, size_t length);
+ObjString* makeStringf(VM* vm, const char* format, ...);
+ObjString* makeStringvf(VM* vm, const char* format, va_list vsnargs);
 
 void printObject(VM* vm, Value value);
 
