@@ -30,6 +30,27 @@ static Value clockNative(VM* vm, uint8_t argCount, Value* args) {
 	return NUMBER_VAL((double)clock() / 1000);
 }
 
+
+//TODO:
+//  len() is temporary until we can access methods on lists & strings :-)
+static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
+	//TODO:
+	//  As native methods have no way of knowing what their arguments are,
+	//  We return null on error
+
+	if(argCount == 0)
+		return NULL_VAL;
+
+	if (IS_LIST(args[0])) {
+		return NUMBER_VAL((double)AS_LIST(args[0])->items.length);
+	}
+	else if (IS_STRING(args[0])) {
+		return NUMBER_VAL((double)AS_STRING(args[0])->length);
+	}
+	
+	return NULL_VAL;
+}
+
 // TODO: Remove all above until the over to-do
 
 void initVM(VM* vm) {
@@ -58,6 +79,7 @@ void initVM(VM* vm) {
 	vm->newString = copyString(vm, "new", 3);
 
 	defineNative(vm, "clock", clockNative);
+	defineNative(vm, "len", lenNative);
 }
 
 void freeVM(VM* vm) {
