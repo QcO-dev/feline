@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <math.h>
 #ifdef FELINE_DEBUG_TRACE_INSTRUCTIONS
 #include "disassemble.h"
 #endif
@@ -27,6 +28,27 @@ static void defineNative(VM* vm, const char* name, NativeFunction function) {
 
 static Value clockNative(VM* vm, uint8_t argCount, Value* args) {
 	return NUMBER_VAL((double)clock() / 1000);
+}
+
+
+//TODO:
+//  len() is temporary until we can access methods on lists & strings :-)
+static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
+	//TODO:
+	//  As native methods have no way of knowing what their arguments are,
+	//  We return null on error
+
+	if(argCount == 0)
+		return NULL_VAL;
+
+	if (IS_LIST(args[0])) {
+		return NUMBER_VAL((double)AS_LIST(args[0])->items.length);
+	}
+	else if (IS_STRING(args[0])) {
+		return NUMBER_VAL((double)AS_STRING(args[0])->length);
+	}
+	
+	return NULL_VAL;
 }
 
 // TODO: Remove all above until the over to-do
@@ -57,6 +79,7 @@ void initVM(VM* vm) {
 	vm->newString = copyString(vm, "new", 3);
 
 	defineNative(vm, "clock", clockNative);
+	defineNative(vm, "len", lenNative);
 }
 
 void freeVM(VM* vm) {
@@ -272,6 +295,28 @@ static bool invoke(VM* vm, ObjString* name, uint8_t argCount) {
 	}
 
 	return invokeFromClass(vm, instance->clazz, name, argCount);
+}
+
+static bool validateIndex(VM* vm, size_t length, double index, size_t* realIndex) {
+	if (floor(index) != index) {
+		runtimeError(vm, "List index must be an integer (got %g)", index);
+		return false;
+	}
+
+	int64_t signedIndex = (int64_t)index;
+
+	size_t absIndex = 0;
+
+	absIndex = signedIndex < 0 ? length - -signedIndex : signedIndex;
+
+	if (absIndex >= length || absIndex < 0) {
+		runtimeError(vm, "List index '%" PRId64 "' out of range for list of length '%zu'", signedIndex, length);
+		return false;
+	}
+
+	*realIndex = absIndex;
+
+	return true;
 }
 
 InterpreterResult executeVM(VM* vm) {
@@ -620,6 +665,86 @@ InterpreterResult executeVM(VM* vm) {
 				frame = &vm->frames.items[vm->frames.length - 1];
 				break;
 			}
+
+			case OP_LIST: {
+				uint16_t length = READ_SHORT();
+
+				ValueArray items;
+				initValueArray(&items);
+
+				for (size_t i = 0; i < length; i++) {
+					writeValueArray(vm, &items, peek(vm, length - i - 1));
+				}
+
+				vm->stack.length -= length;
+
+				push(vm, OBJ_VAL(newList(vm, items)));
+				break;
+			}
+
+			case OP_ACCESS_SUBSCRIPT: {
+				Value index = peek(vm, 0);
+				Value indexee = peek(vm, 1);
+
+				if (IS_LIST(indexee)) {
+					ObjList* list = AS_LIST(indexee);
+
+					if (!IS_NUMBER(index)) {
+						runtimeError(vm, "List index must be a number");
+						return INTERPRETER_RUNTIME_ERROR;
+					}
+
+					size_t realIndex;
+					if (!validateIndex(vm, list->items.length, AS_NUMBER(index), &realIndex)) {
+						return INTERPRETER_RUNTIME_ERROR;
+					}
+
+					pop(vm);
+					pop(vm);
+					push(vm, list->items.items[realIndex]);
+
+				}
+				else {
+					runtimeError(vm, "Invalid subscript target");
+					return INTERPRETER_RUNTIME_ERROR;
+				}
+
+				break;
+			}
+
+			case OP_ASSIGN_SUBSCRIPT: {
+				Value value = peek(vm, 0);
+				Value index = peek(vm, 1);
+				Value indexee = peek(vm, 2);
+
+				if (IS_LIST(indexee)) {
+					ObjList* list = AS_LIST(indexee);
+
+					if (!IS_NUMBER(index)) {
+						runtimeError(vm, "List index must be a number");
+						return INTERPRETER_RUNTIME_ERROR;
+					}
+
+					size_t realIndex;
+					if (!validateIndex(vm, list->items.length, AS_NUMBER(index), &realIndex)) {
+						return INTERPRETER_RUNTIME_ERROR;
+					}
+
+					list->items.items[realIndex] = value;
+
+					pop(vm);
+					pop(vm);
+					pop(vm);
+					push(vm, value);
+				}
+				else {
+					runtimeError(vm, "Invalid subscript target");
+					return INTERPRETER_RUNTIME_ERROR;
+				}
+
+				break;
+			}
+
 		}
 
 	}

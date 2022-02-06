@@ -94,6 +94,14 @@ ObjBoundMethod* newBoundMethod(VM* vm, Value receiver, ObjClosure* method) {
 	return bound;
 }
 
+// ========= Lists =========
+
+ObjList* newList(VM* vm, ValueArray items) {
+	ObjList* list = ALLOCATE_OBJ(vm, ObjList, OBJ_LIST);
+	list->items = items;
+	return list;
+}
+
 // ========= Strings =========
 
 static ObjString* allocateString(VM* vm, char* str, size_t length, uint32_t hash) {
@@ -182,6 +190,19 @@ void printObject(VM* vm, Value value) {
 		}
 		case OBJ_FUNCTION: {
 			printFunction(vm, AS_FUNCTION(value));
+			break;
+		}
+
+		case OBJ_LIST: {
+			ObjList* list = AS_LIST(value);
+			printf("[");
+
+			for (size_t i = 0; i < list->items.length; i++) {
+				printValue(vm, list->items.items[i]);
+				if (i != list->items.length - 1) printf(", ");
+			}
+
+			printf("]");
 			break;
 		}
 	}

@@ -628,6 +628,38 @@ static void logicalOr(Compiler* compiler, bool canAssign) {
 	patchJump(compiler, endJump);
 }
 
+static void list(Compiler* compiler, bool canAssign) {
+	uint16_t length = 0;
+
+	if (!check(compiler, TOKEN_RIGHT_SQUARE)) {
+		do {
+			expression(compiler);
+			if (length == UINT16_MAX) {
+				error(compiler, "Cannot have more than 65,536 items in list literal");
+			}
+			length++;
+		} while (match(compiler, TOKEN_COMMA));
+	}
+
+	consume(compiler, TOKEN_RIGHT_SQUARE, "Expected ')' after arguments");
+
+	emitOOInstruction(compiler, OP_LIST, length);
+}
+
+static void subscript(Compiler* compiler, bool canAssign) {
+	expression(compiler);
+
+	consume(compiler, TOKEN_RIGHT_SQUARE, "Expected ']' after subscript");
+
+	if (canAssign && match(compiler, TOKEN_EQUAL)) {
+		expression(compiler);
+		emitByte(compiler, OP_ASSIGN_SUBSCRIPT);
+	}
+	else {
+		emitByte(compiler, OP_ACCESS_SUBSCRIPT);
+	}
+}
+
 static void parsePrecedence(Compiler* compiler, Precedence precedence) {
 	advance(compiler);
 
@@ -979,6 +1011,8 @@ ParseRule rules[] = {
 	[TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
 	[TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
+	[TOKEN_LEFT_SQUARE] = {list, subscript, PREC_CALL},
+	[TOKEN_RIGHT_SQUARE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_PLUS] = {NULL, binary, PREC_TERM},
 	[TOKEN_MINUS] = {unary, binary, PREC_TERM},
 	[TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
@@ -1022,7 +1056,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(42 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(44 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(TokenType type) {
 	return &rules[type];

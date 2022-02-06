@@ -128,6 +128,12 @@ static void blackenObject(VM* vm, Obj* object) {
 			ObjBoundMethod* bound = (ObjBoundMethod*)object;
 			markValue(vm, bound->receiver);
 			markObject(vm, (Obj*)bound->method);
+			break;
+		}
+		case OBJ_LIST: {
+			ObjList* list = (ObjList*)object;
+			markArray(vm, &list->items);
+			break;
 		}
 		case OBJ_NATIVE:
 		case OBJ_STRING: {
@@ -232,6 +238,12 @@ static void freeObject(VM* vm, Obj* object) {
 		}
 		case OBJ_BOUND_METHOD: {
 			FREE(vm, ObjBoundMethod, object);
+			break;
+		}
+		case OBJ_LIST: {
+			ObjList* list = (ObjList*)object;
+			freeValueArray(vm, &list->items);
+			FREE(vm, ObjList, object);
 			break;
 		}
 	}

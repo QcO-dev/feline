@@ -14,6 +14,7 @@ typedef enum ObjType {
 	OBJ_CLASS,
 	OBJ_INSTANCE,
 	OBJ_BOUND_METHOD,
+	OBJ_LIST,
 } ObjType;
 
 struct Obj {
@@ -69,6 +70,11 @@ typedef struct ObjBoundMethod {
 	ObjClosure* method;
 } ObjBoundMethod;
 
+typedef struct ObjList {
+	Obj obj;
+	ValueArray items;
+} ObjList;
+
 struct ObjString {
 	Obj obj;
 	size_t length;
@@ -94,6 +100,8 @@ ObjInstance* newInstance(VM* vm, ObjClass* clazz);
 
 ObjBoundMethod* newBoundMethod(VM* vm, Value receiver, ObjClosure* method);
 
+ObjList* newList(VM* vm, ValueArray items);
+
 ObjString* copyString(VM* vm, const char* str, size_t length);
 ObjString* takeString(VM* vm, char* str, size_t length);
 
@@ -108,6 +116,7 @@ void printObject(VM* vm, Value value);
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
 #define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
+#define IS_LIST(value) isObjType(value, OBJ_LIST)
 
 #define AS_STRING(value) ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->str)
@@ -118,3 +127,4 @@ void printObject(VM* vm, Value value);
 #define AS_CLASS(value) ((ObjClass*)AS_OBJ(value))
 #define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
 #define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
+#define AS_LIST(value) ((ObjList*)AS_OBJ(value))
