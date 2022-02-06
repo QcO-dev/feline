@@ -803,6 +803,13 @@ static void returnStatement(Compiler* compiler) {
 	}
 }
 
+static void throwStatement(Compiler* compiler) {
+	expression(compiler);
+
+	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after throw");
+	emitByte(compiler, OP_THROW);
+}
+
 static void expressionStatement(Compiler* compiler) {
 	expression(compiler);
 	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression");
@@ -829,6 +836,9 @@ static void statement(Compiler* compiler) {
 	}
 	else if (match(compiler, TOKEN_RETURN)) {
 		returnStatement(compiler);
+	}
+	else if (match(compiler, TOKEN_THROW)) {
+		throwStatement(compiler);
 	}
 	else if (match(compiler, TOKEN_WHILE)) {
 		whileStatement(compiler);
@@ -1048,6 +1058,7 @@ ParseRule rules[] = {
 	[TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
 	[TOKEN_SUPER] = {super_, NULL, PREC_NONE},
 	[TOKEN_THIS] = {this_, NULL, PREC_NONE},
+	[TOKEN_THROW] = {NULL, NULL, PREC_NONE},
 	[TOKEN_TRUE] = {literal, NULL, PREC_NONE},
 	[TOKEN_VAR] = {NULL, NULL, PREC_NONE},
 	[TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
@@ -1056,7 +1067,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(44 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(45 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(TokenType type) {
 	return &rules[type];

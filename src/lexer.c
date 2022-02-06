@@ -152,7 +152,15 @@ static TokenType identifierType(Lexer* lexer) {
 		case 't': {
 			if (lexer->current - lexer->start > 1) {
 				switch (lexer->start[1]) {
-					case 'h': return checkKeyword(lexer, 2, 2, "is", TOKEN_THIS);
+					case 'h': {
+						if (lexer->current - lexer->start > 2) {
+							switch (lexer->start[2]) {
+								case 'i': return checkKeyword(lexer, 3, 1, "s", TOKEN_THIS);
+								case 'r': return checkKeyword(lexer, 3, 2, "ow", TOKEN_THROW);
+							}
+						}
+						break;
+					}
 					case 'r': return checkKeyword(lexer, 2, 2, "ue", TOKEN_TRUE);
 				}
 			}

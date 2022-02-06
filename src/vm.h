@@ -21,6 +21,9 @@ typedef struct VM {
 	Table globals;
 	Table strings;
 
+	Value exception;
+	bool hasException;
+
 	ObjString* newString;
 
 	Compiler* lowestLevelCompiler;

@@ -66,6 +66,8 @@ void initVM(VM* vm) {
 	vm->openUpvalues = NULL;
 	vm->lowestLevelCompiler = NULL;
 	vm->newString = NULL;
+	vm->hasException = false;
+	vm->exception = NULL_VAL;
 	initValueArray(&vm->stack);
 	initCallFrameArray(&vm->frames);
 	initTable(&vm->strings);
@@ -342,6 +344,30 @@ InterpreterResult executeVM(VM* vm) {
 #endif
 
 	for (;;) {
+
+		if (vm->hasException) {
+			ValueArray stackTrace;
+			initValueArray(&stackTrace);
+			push(vm, OBJ_VAL(newList(vm, stackTrace)));
+			while (vm->hasException) {
+				closeUpvalues(vm, &vm->stack.items[frame->slotsOffset]);
+
+				vm->frames.length--;
+
+				if (vm->frames.length == 0) {
+					Value stackTrace = pop(vm);
+					pop(vm); // The script function
+					printf("Exception\n");
+					printValue(vm, stackTrace);
+					return INTERPRETER_RUNTIME_ERROR;
+				}
+
+				vm->stack.length = frame->slotsOffset;
+
+				frame = &vm->frames.items[vm->frames.length - 1];
+				break;
+			}
+		}
 
 #ifdef FELINE_DEBUG_TRACE_INSTRUCTIONS
 		printf(" [ ");
@@ -742,6 +768,12 @@ InterpreterResult executeVM(VM* vm) {
 					return INTERPRETER_RUNTIME_ERROR;
 				}
 
+				break;
+			}
+
+			case OP_THROW: {
+				vm->exception = pop(vm);
+				vm->hasException = true;
 				break;
 			}
 

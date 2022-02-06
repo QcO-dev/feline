@@ -78,6 +78,7 @@ static void markRoots(VM* vm) {
 
 	markCompilerRoots(vm);
 	markObject(vm, (Obj*)vm->newString);
+	markValue(vm, vm->exception);
 }
 
 static void markArray(VM* vm, ValueArray* array) {
