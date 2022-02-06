@@ -651,7 +651,13 @@ static void subscript(Compiler* compiler, bool canAssign) {
 
 	consume(compiler, TOKEN_RIGHT_SQUARE, "Expected ']' after subscript");
 
-	emitByte(compiler, OP_ACCESS_SUBSCRIPT);
+	if (canAssign && match(compiler, TOKEN_EQUAL)) {
+		expression(compiler);
+		emitByte(compiler, OP_ASSIGN_SUBSCRIPT);
+	}
+	else {
+		emitByte(compiler, OP_ACCESS_SUBSCRIPT);
+	}
 }
 
 static void parsePrecedence(Compiler* compiler, Precedence precedence) {

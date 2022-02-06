@@ -690,6 +690,39 @@ InterpreterResult executeVM(VM* vm) {
 				break;
 			}
 
+			case OP_ASSIGN_SUBSCRIPT: {
+				Value value = peek(vm, 0);
+				Value index = peek(vm, 1);
+				Value indexee = peek(vm, 2);
+
+				if (IS_LIST(indexee)) {
+					ObjList* list = AS_LIST(indexee);
+
+					if (!IS_NUMBER(index)) {
+						runtimeError(vm, "List index must be a number");
+						return INTERPRETER_RUNTIME_ERROR;
+					}
+
+					size_t realIndex;
+					if (!validateIndex(vm, list->items.length, AS_NUMBER(index), &realIndex)) {
+						return INTERPRETER_RUNTIME_ERROR;
+					}
+
+					list->items.items[realIndex] = value;
+
+					pop(vm);
+					pop(vm);
+					pop(vm);
+					push(vm, value);
+				}
+				else {
+					runtimeError(vm, "Invalid subscript target");
+					return INTERPRETER_RUNTIME_ERROR;
+				}
+
+				break;
+			}
+
 		}
 
 	}

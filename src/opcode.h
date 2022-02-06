@@ -54,6 +54,7 @@ typedef enum Opcode {
 	// Lists
 	OP_LIST,
 	OP_ACCESS_SUBSCRIPT,
+	OP_ASSIGN_SUBSCRIPT,
 	// Misc.
 	OP_PRINT,
 
