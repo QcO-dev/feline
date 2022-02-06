@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <math.h>
 #ifdef FELINE_DEBUG_TRACE_INSTRUCTIONS
 #include "disassemble.h"
 #endif
@@ -272,6 +273,28 @@ static bool invoke(VM* vm, ObjString* name, uint8_t argCount) {
 	}
 
 	return invokeFromClass(vm, instance->clazz, name, argCount);
+}
+
+static bool validateIndex(VM* vm, size_t length, double index, size_t* realIndex) {
+	if (floor(index) != index) {
+		runtimeError(vm, "List index must be an integer (got %g)", index);
+		return false;
+	}
+
+	int64_t signedIndex = (int64_t)index;
+
+	size_t absIndex = 0;
+
+	absIndex = signedIndex < 0 ? length - -signedIndex : signedIndex;
+
+	if (absIndex >= length || absIndex < 0) {
+		runtimeError(vm, "List index '%" PRId64 "' out of range for list of length '%zu'", signedIndex, length);
+		return false;
+	}
+
+	*realIndex = absIndex;
+
+	return true;
 }
 
 InterpreterResult executeVM(VM* vm) {
@@ -634,6 +657,36 @@ InterpreterResult executeVM(VM* vm) {
 				vm->stack.length -= length;
 
 				push(vm, OBJ_VAL(newList(vm, items)));
+				break;
+			}
+
+			case OP_ACCESS_SUBSCRIPT: {
+				Value index = peek(vm, 0);
+				Value indexee = peek(vm, 1);
+
+				if (IS_LIST(indexee)) {
+					ObjList* list = AS_LIST(indexee);
+
+					if (!IS_NUMBER(index)) {
+						runtimeError(vm, "List index must be a number");
+						return INTERPRETER_RUNTIME_ERROR;
+					}
+
+					size_t realIndex;
+					if (!validateIndex(vm, list->items.length, AS_NUMBER(index), &realIndex)) {
+						return INTERPRETER_RUNTIME_ERROR;
+					}
+
+					pop(vm);
+					pop(vm);
+					push(vm, list->items.items[realIndex]);
+
+				}
+				else {
+					runtimeError(vm, "Invalid subscript target");
+					return INTERPRETER_RUNTIME_ERROR;
+				}
+
 				break;
 			}
 

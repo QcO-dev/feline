@@ -53,6 +53,7 @@ typedef enum Opcode {
 	OP_SUPER_INVOKE,
 	// Lists
 	OP_LIST,
+	OP_ACCESS_SUBSCRIPT,
 	// Misc.
 	OP_PRINT,
 

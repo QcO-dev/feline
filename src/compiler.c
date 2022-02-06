@@ -646,6 +646,14 @@ static void list(Compiler* compiler, bool canAssign) {
 	emitOOInstruction(compiler, OP_LIST, length);
 }
 
+static void subscript(Compiler* compiler, bool canAssign) {
+	expression(compiler);
+
+	consume(compiler, TOKEN_RIGHT_SQUARE, "Expected ']' after subscript");
+
+	emitByte(compiler, OP_ACCESS_SUBSCRIPT);
+}
+
 static void parsePrecedence(Compiler* compiler, Precedence precedence) {
 	advance(compiler);
 
@@ -997,7 +1005,7 @@ ParseRule rules[] = {
 	[TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
 	[TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
-	[TOKEN_LEFT_SQUARE] = {list, NULL, PREC_NONE},
+	[TOKEN_LEFT_SQUARE] = {list, subscript, PREC_CALL},
 	[TOKEN_RIGHT_SQUARE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_PLUS] = {NULL, binary, PREC_TERM},
 	[TOKEN_MINUS] = {unary, binary, PREC_TERM},
