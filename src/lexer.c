@@ -185,6 +185,8 @@ Token lexToken(Lexer* lexer) {
 		case ')': return makeToken(lexer, TOKEN_RIGHT_PAREN);
 		case '{': return makeToken(lexer, TOKEN_LEFT_BRACE);
 		case '}': return makeToken(lexer, TOKEN_RIGHT_BRACE);
+		case '[': return makeToken(lexer, TOKEN_LEFT_SQUARE);
+		case ']': return makeToken(lexer, TOKEN_RIGHT_SQUARE);
 		case '+': return makeToken(lexer, TOKEN_PLUS);
 		case '-': return makeToken(lexer, TOKEN_MINUS);
 		case '*': return makeToken(lexer, TOKEN_STAR);

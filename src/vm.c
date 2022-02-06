@@ -620,6 +620,23 @@ InterpreterResult executeVM(VM* vm) {
 				frame = &vm->frames.items[vm->frames.length - 1];
 				break;
 			}
+
+			case OP_LIST: {
+				uint16_t length = READ_SHORT();
+
+				ValueArray items;
+				initValueArray(&items);
+
+				for (size_t i = 0; i < length; i++) {
+					writeValueArray(vm, &items, peek(vm, length - i - 1));
+				}
+
+				vm->stack.length -= length;
+
+				push(vm, OBJ_VAL(newList(vm, items)));
+				break;
+			}
+
 		}
 
 	}
