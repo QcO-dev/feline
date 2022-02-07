@@ -360,6 +360,12 @@ InterpreterResult executeVM(VM* vm) {
 					frame->ip = frame->catchLocation;
 					frame->isTryBlock = false;
 					frame->catchLocation = NULL;
+
+					//TODO: Instance of an exception should get stackTrace
+					if (IS_INSTANCE(vm->exception)) {
+						tableSet(vm, &AS_INSTANCE(vm->exception)->fields, copyString(vm, "stackTrace", 10), peek(vm, 0));
+					}
+
 					pop(vm);
 					vm->hasException = false;
 					break;
