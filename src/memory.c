@@ -77,7 +77,11 @@ static void markRoots(VM* vm) {
 	markTable(vm, &vm->globals);
 
 	markCompilerRoots(vm);
-	markObject(vm, (Obj*)vm->newString);
+	
+	for (size_t i = 0; i < INTERNAL_STR__COUNT; i++) {
+		markObject(vm, (Obj*)vm->internalStrings[i]);
+	}
+
 	markValue(vm, vm->exception);
 }
 

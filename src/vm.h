@@ -17,6 +17,12 @@ typedef struct CallFrame {
 
 DECLARE_DYNAMIC_ARRAY(CallFrame, CallFrame)
 
+typedef enum InternalString {
+	INTERNAL_STR_NEW,
+	INTERNAL_STR_STACKTRACE,
+	INTERNAL_STR__COUNT
+} InternalString;
+
 typedef struct VM {
 	ValueArray stack;
 	CallFrameArray frames;
@@ -27,7 +33,7 @@ typedef struct VM {
 	Value exception;
 	bool hasException;
 
-	ObjString* newString;
+	ObjString* internalStrings[INTERNAL_STR__COUNT];
 
 	Compiler* lowestLevelCompiler;
 	ObjUpvalue* openUpvalues;

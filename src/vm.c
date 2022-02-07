@@ -53,6 +53,11 @@ static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
 
 // TODO: Remove all above until the over to-do
 
+void buildInternalStrings(VM* vm) {
+	vm->internalStrings[INTERNAL_STR_NEW] = copyString(vm, "new", 3);
+	vm->internalStrings[INTERNAL_STR_STACKTRACE] = copyString(vm, "stackTrace", 10);
+}
+
 void initVM(VM* vm) {
 	vm->objects = NULL;
 
@@ -65,7 +70,9 @@ void initVM(VM* vm) {
 
 	vm->openUpvalues = NULL;
 	vm->lowestLevelCompiler = NULL;
-	vm->newString = NULL;
+	
+	for (size_t i = 0; i < INTERNAL_STR__COUNT; i++) vm->internalStrings[i] = NULL;
+
 	vm->hasException = false;
 	vm->exception = NULL_VAL;
 	initValueArray(&vm->stack);
@@ -78,7 +85,7 @@ void initVM(VM* vm) {
 	push(vm, NULL_VAL);
 	pop(vm);
 
-	vm->newString = copyString(vm, "new", 3);
+	buildInternalStrings(vm);
 
 	defineNative(vm, "clock", clockNative);
 	defineNative(vm, "len", lenNative);
@@ -89,7 +96,6 @@ void freeVM(VM* vm) {
 	freeTable(vm, &vm->globals);
 	freeValueArray(vm, &vm->stack);
 	freeCallFrameArray(vm, &vm->frames);
-	vm->newString = NULL;
 	freeObjects(vm);
 }
 
@@ -182,7 +188,7 @@ static bool callValue(VM* vm, Value callee, uint8_t argCount) {
 				vm->stack.items[vm->stack.length - argCount - 1] = OBJ_VAL(newInstance(vm, clazz));
 
 				Value initializer;
-				if (tableGet(&clazz->methods, vm->newString, &initializer)) {
+				if (tableGet(&clazz->methods, vm->internalStrings[INTERNAL_STR_NEW], &initializer)) {
 					return callClosure(vm, AS_CLOSURE(initializer), argCount);
 				}
 				else if (argCount != 0) {
@@ -363,7 +369,7 @@ InterpreterResult executeVM(VM* vm) {
 
 					//TODO: Instance of an exception should get stackTrace
 					if (IS_INSTANCE(vm->exception)) {
-						tableSet(vm, &AS_INSTANCE(vm->exception)->fields, copyString(vm, "stackTrace", 10), peek(vm, 0));
+						tableSet(vm, &AS_INSTANCE(vm->exception)->fields, vm->internalStrings[INTERNAL_STR_STACKTRACE], peek(vm, 0));
 					}
 
 					pop(vm);
