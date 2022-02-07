@@ -59,6 +59,7 @@ typedef enum Opcode {
 	OP_THROW,
 	OP_TRY_BEGIN,
 	OP_TRY_END,
+	OP_BOUND_EXCEPTION,
 	// Misc.
 	OP_PRINT,
 

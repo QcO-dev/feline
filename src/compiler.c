@@ -46,6 +46,8 @@ typedef struct Compiler {
 
 	ClassCompiler* currentClass;
 
+	bool inTryBlock;
+
 	// TODO:
 	//   Currently only supports 256 locals in the compiler
 	//   The runtime environment can support up to 2^16
@@ -87,6 +89,7 @@ static void statement(Compiler* compiler);
 static void declaration(Compiler* compiler);
 static void varDeclaration(Compiler* compiler);
 static void expressionStatement(Compiler* compiler);
+static void blockStatement(Compiler* compiler);
 
 // ========= Helper Functions =========
 
@@ -99,6 +102,7 @@ static void initCompiler(VM* vm, Compiler* compiler, FunctionType type) {
 	compiler->localCount = 0;
 	compiler->scopeDepth = 0;
 	compiler->currentClass = NULL;
+	compiler->inTryBlock = false;
 	compiler->function = newFunction(compiler->vm);
 
 	if (type != TYPE_SCRIPT) {
@@ -429,6 +433,21 @@ static void endScope(Compiler* compiler) {
 			emitByte(compiler, OP_POP);
 		}
 		compiler->localCount--;
+	}
+}
+
+static void emitScopeEnd(Compiler* compiler) {
+	int32_t depth = compiler->scopeDepth - 1;
+	int32_t count = compiler->localCount;
+
+	while (count > 0 && compiler->locals[count - 1].depth > depth) {
+		if (compiler->locals[count - 1].isCaptured) {
+			emitByte(compiler, OP_CLOSE_UPVALUE);
+		}
+		else {
+			emitByte(compiler, OP_POP);
+		}
+		count--;
 	}
 }
 
@@ -811,25 +830,43 @@ static void throwStatement(Compiler* compiler) {
 }
 
 static void tryStatement(Compiler* compiler) {
+	if (compiler->inTryBlock) {
+		error(compiler, "Cannot nest try blocks");
+	}
+
 	// try ...
 	size_t tryBegin = emitJump(compiler, OP_TRY_BEGIN);
 
-	statement(compiler);
+	compiler->inTryBlock = true;
+
+	if (!match(compiler, TOKEN_LEFT_BRACE)) {
+		error(compiler, "Expected '{' after 'try'");
+	}
+
+	beginScope(compiler);
+	blockStatement(compiler);
+
+	emitScopeEnd(compiler);
+
+	compiler->inTryBlock = false;
 
 	size_t catchJump = emitJump(compiler, OP_JUMP);
 
 	emitByte(compiler, OP_TRY_END);
+
+	patchJump(compiler, tryBegin);
+
+	endScope(compiler);
 	// catch(e) ...
 
 	consume(compiler, TOKEN_CATCH, "Expected catch after try statement");
 
 	beginScope(compiler);
 
-	patchJump(compiler, tryBegin);
-
 	consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after catch");
 
 	uint16_t boundCatchVariable = parseVariable(compiler, "Expected catch binding name");
+	emitByte(compiler, OP_BOUND_EXCEPTION);
 	defineVariable(compiler, boundCatchVariable);
 
 	consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after catch variable");

@@ -361,7 +361,6 @@ InterpreterResult executeVM(VM* vm) {
 					frame->isTryBlock = false;
 					frame->catchLocation = NULL;
 					pop(vm);
-					push(vm, vm->exception);
 					vm->hasException = false;
 					break;
 				}
@@ -823,6 +822,11 @@ InterpreterResult executeVM(VM* vm) {
 			case OP_TRY_END: {
 				frame->catchLocation = NULL;
 				frame->isTryBlock = false;
+				break;
+			}
+
+			case OP_BOUND_EXCEPTION: {
+				push(vm, vm->exception);
 				break;
 			}
 		}
