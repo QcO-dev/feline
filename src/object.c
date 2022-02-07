@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #define ALLOCATE_OBJ(vm, type, objectType) (type*)allocateObject(vm, sizeof(type), objectType);
 
@@ -72,6 +73,7 @@ ObjNative* newNative(VM* vm, NativeFunction function) {
 ObjClass* newClass(VM* vm, ObjString* name) {
 	ObjClass* clazz = ALLOCATE_OBJ(vm, ObjClass, OBJ_CLASS);
 	clazz->name = name;
+	clazz->superclass = NULL;
 	initTable(&clazz->methods);
 	return clazz;
 }
@@ -148,6 +150,27 @@ ObjString* takeString(VM* vm, char* str, size_t length) {
 	}
 
 	return allocateString(vm, str, length, hash);
+}
+
+ObjString* makeStringf(VM* vm, const char* format, ...) {
+	va_list args;
+	va_start(args, format);
+	ObjString* string = makeStringvf(vm, format, args);
+	va_end(args);
+
+	return string;
+}
+
+ObjString* makeStringvf(VM* vm, const char* format, va_list vsnargs) {
+	va_list vsargs;
+	va_copy(vsargs, vsnargs);
+	size_t length = vsnprintf(NULL, 0, format, vsnargs);
+	va_end(vsnargs);
+	char* string = ALLOCATE(vm, char, length + 1);
+
+	vsprintf(string, format, vsargs);
+
+	return takeString(vm, string, length);
 }
 
 // ========= Misc. =========

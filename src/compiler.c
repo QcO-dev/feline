@@ -46,6 +46,8 @@ typedef struct Compiler {
 
 	ClassCompiler* currentClass;
 
+	bool inTryBlock;
+
 	// TODO:
 	//   Currently only supports 256 locals in the compiler
 	//   The runtime environment can support up to 2^16
@@ -87,6 +89,7 @@ static void statement(Compiler* compiler);
 static void declaration(Compiler* compiler);
 static void varDeclaration(Compiler* compiler);
 static void expressionStatement(Compiler* compiler);
+static void blockStatement(Compiler* compiler);
 
 // ========= Helper Functions =========
 
@@ -99,6 +102,7 @@ static void initCompiler(VM* vm, Compiler* compiler, FunctionType type) {
 	compiler->localCount = 0;
 	compiler->scopeDepth = 0;
 	compiler->currentClass = NULL;
+	compiler->inTryBlock = false;
 	compiler->function = newFunction(compiler->vm);
 
 	if (type != TYPE_SCRIPT) {
@@ -346,7 +350,7 @@ static void declareVariable(Compiler* compiler) {
 
 	Token* name = &compiler->previous;
 
-	for (int32_t i = compiler->localCount; i >= 0; i--) {
+	for (int32_t i = compiler->localCount - 1; i >= 0; i--) {
 		Local* local = &compiler->locals[i];
 		if (local->depth != -1 && local->depth < compiler->scopeDepth) {
 			break;
@@ -429,6 +433,21 @@ static void endScope(Compiler* compiler) {
 			emitByte(compiler, OP_POP);
 		}
 		compiler->localCount--;
+	}
+}
+
+static void emitScopeEnd(Compiler* compiler) {
+	int32_t depth = compiler->scopeDepth - 1;
+	int32_t count = compiler->localCount;
+
+	while (count > 0 && compiler->locals[count - 1].depth > depth) {
+		if (compiler->locals[count - 1].isCaptured) {
+			emitByte(compiler, OP_CLOSE_UPVALUE);
+		}
+		else {
+			emitByte(compiler, OP_POP);
+		}
+		count--;
 	}
 }
 
@@ -803,6 +822,66 @@ static void returnStatement(Compiler* compiler) {
 	}
 }
 
+static void throwStatement(Compiler* compiler) {
+	expression(compiler);
+
+	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after throw");
+	emitByte(compiler, OP_THROW);
+}
+
+static void tryStatement(Compiler* compiler) {
+	if (compiler->inTryBlock) {
+		error(compiler, "Cannot nest try blocks");
+	}
+
+	// try ...
+	size_t tryBegin = emitJump(compiler, OP_TRY_BEGIN);
+
+	compiler->inTryBlock = true;
+
+	if (!match(compiler, TOKEN_LEFT_BRACE)) {
+		error(compiler, "Expected '{' after 'try'");
+	}
+
+	beginScope(compiler);
+	blockStatement(compiler);
+
+	emitScopeEnd(compiler);
+
+	compiler->inTryBlock = false;
+
+	size_t catchJump = emitJump(compiler, OP_JUMP);
+
+	emitByte(compiler, OP_TRY_END);
+
+	patchJump(compiler, tryBegin);
+
+	endScope(compiler);
+	// catch(e) ...
+
+	consume(compiler, TOKEN_CATCH, "Expected catch after try statement");
+
+	beginScope(compiler);
+
+	if (match(compiler, TOKEN_LEFT_PAREN)) {
+		uint16_t boundCatchVariable = parseVariable(compiler, "Expected catch binding name");
+		emitByte(compiler, OP_BOUND_EXCEPTION);
+		defineVariable(compiler, boundCatchVariable);
+
+		consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after catch variable");
+	}
+
+	statement(compiler);
+
+	endScope(compiler);
+
+	patchJump(compiler, catchJump);
+
+	if (match(compiler, TOKEN_FINALLY)) {
+		statement(compiler);
+	}
+}
+
 static void expressionStatement(Compiler* compiler) {
 	expression(compiler);
 	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression");
@@ -829,6 +908,12 @@ static void statement(Compiler* compiler) {
 	}
 	else if (match(compiler, TOKEN_RETURN)) {
 		returnStatement(compiler);
+	}
+	else if (match(compiler, TOKEN_THROW)) {
+		throwStatement(compiler);
+	}
+	else if (match(compiler, TOKEN_TRY)) {
+		tryStatement(compiler);
 	}
 	else if (match(compiler, TOKEN_WHILE)) {
 		whileStatement(compiler);
@@ -1037,9 +1122,11 @@ ParseRule rules[] = {
 	[TOKEN_NUMBER] = {number, NULL, PREC_NONE},
 
 	[TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
+	[TOKEN_CATCH] = {NULL, NULL, PREC_NONE},
 	[TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
 	[TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FALSE] = {literal, NULL, PREC_NONE},
+	[TOKEN_FINALLY] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FOR] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FUNCTION] = {NULL, NULL, PREC_NONE},
 	[TOKEN_IF] = {NULL, NULL, PREC_NONE},
@@ -1048,7 +1135,9 @@ ParseRule rules[] = {
 	[TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
 	[TOKEN_SUPER] = {super_, NULL, PREC_NONE},
 	[TOKEN_THIS] = {this_, NULL, PREC_NONE},
+	[TOKEN_THROW] = {NULL, NULL, PREC_NONE},
 	[TOKEN_TRUE] = {literal, NULL, PREC_NONE},
+	[TOKEN_TRY] = {NULL, NULL, PREC_NONE},
 	[TOKEN_VAR] = {NULL, NULL, PREC_NONE},
 	[TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
 
@@ -1056,7 +1145,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(44 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(48 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(TokenType type) {
 	return &rules[type];

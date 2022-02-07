@@ -53,6 +53,21 @@ static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
 
 // TODO: Remove all above until the over to-do
 
+void buildInternalStrings(VM* vm) {
+	vm->internalStrings[INTERNAL_STR_NEW] = copyString(vm, "new", 3);
+	vm->internalStrings[INTERNAL_STR_STACKTRACE] = copyString(vm, "stackTrace", 10);
+	vm->internalStrings[INTERNAL_STR_EXCEPTION] = copyString(vm, "Exception", 9);
+
+	vm->internalStrings[INTERNAL_STR_TYPE_EXCEPTION] = copyString(vm, "TypeException", 13);
+	vm->internalStrings[INTERNAL_STR_ARITY_EXCEPTION] = copyString(vm, "ArityException", 14);
+	vm->internalStrings[INTERNAL_STR_PROPERTY_EXCEPTION] = copyString(vm, "PropertyException", 17);
+	vm->internalStrings[INTERNAL_STR_INDEX_RANGE_EXCEPTION] = copyString(vm, "IndexRangeException", 19);
+	vm->internalStrings[INTERNAL_STR_UNDEFINED_VARIABLE_EXCEPTION] = copyString(vm, "UndefinedVariableException", 26);
+	vm->internalStrings[INTERNAL_STR_STACK_OVERFLOW_EXCEPTION] = copyString(vm, "StackOverflowException", 22);
+
+	vm->internalStrings[INTERNAL_STR_REASON] = copyString(vm, "reason", 6);
+}
+
 void initVM(VM* vm) {
 	vm->objects = NULL;
 
@@ -65,7 +80,12 @@ void initVM(VM* vm) {
 
 	vm->openUpvalues = NULL;
 	vm->lowestLevelCompiler = NULL;
-	vm->newString = NULL;
+	
+	for (size_t i = 0; i < INTERNAL_STR__COUNT; i++) vm->internalStrings[i] = NULL;
+	for (size_t i = 0; i < INTERNAL_EXCEPTION__COUNT; i++) vm->internalExceptions[i] = NULL;
+
+	vm->hasException = false;
+	vm->exception = NULL_VAL;
 	initValueArray(&vm->stack);
 	initCallFrameArray(&vm->frames);
 	initTable(&vm->strings);
@@ -76,7 +96,9 @@ void initVM(VM* vm) {
 	push(vm, NULL_VAL);
 	pop(vm);
 
-	vm->newString = copyString(vm, "new", 3);
+	buildInternalStrings(vm);
+
+	defineExceptionClasses(vm);
 
 	defineNative(vm, "clock", clockNative);
 	defineNative(vm, "len", lenNative);
@@ -87,7 +109,6 @@ void freeVM(VM* vm) {
 	freeTable(vm, &vm->globals);
 	freeValueArray(vm, &vm->stack);
 	freeCallFrameArray(vm, &vm->frames);
-	vm->newString = NULL;
 	freeObjects(vm);
 }
 
@@ -103,28 +124,48 @@ Value peek(VM* vm, size_t distance) {
 	return vm->stack.items[vm->stack.length - 1 - distance];
 }
 
+void inheritClasses(VM* vm, ObjClass* subclass, ObjClass* superclass) {
+	tableAddAll(vm, &superclass->methods, &subclass->methods);
+	subclass->superclass = superclass;
+}
+
+bool instanceof(ObjInstance* instance, ObjClass* clazz) {
+	ObjClass* parent = instance->clazz;
+	while (parent != NULL) {
+		if (parent == clazz) {
+			return true;
+		}
+		parent = parent->superclass;
+	}
+	return false;
+}
+
 static void resetStack(VM* vm) {
 	vm->stack.length = 0;
 	vm->openUpvalues = NULL;
 }
 
-static void runtimeError(VM* vm, const char* format, ...) {
+static void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...) {
 	va_list args;
 	va_start(args, format);
-	vfprintf(stderr, format, args);
+	ObjString* reason = makeStringvf(vm, format, args);
 	va_end(args);
 
-	fputs("\n", stderr);
+	push(vm, OBJ_VAL(reason));
 
-	for (size_t i = vm->frames.length; i > 0; i--) {
-		CallFrame* frame = &vm->frames.items[i - 1];
-		ObjFunction* function = frame->closure->function;
-		size_t instruction = frame->ip - function->chunk.bytecode.items - 1;
-		
-		fprintf(stderr, "[%zu] in %s\n", getLineOfInstruction(&function->chunk, instruction), function->name != NULL ? function->name->str : "<script>");
-	}
+	//TODO:
+	//  Actually call the Exception constructor (currently does not exist)
+	ObjInstance* exception = newInstance(vm, exceptionType);
 
-	resetStack(vm);
+	push(vm, OBJ_VAL(exception));
+
+	tableSet(vm, &exception->fields, vm->internalStrings[INTERNAL_STR_REASON], peek(vm, 1));
+
+	vm->exception = OBJ_VAL(exception);
+	vm->hasException = true;
+	
+	pop(vm);
+	pop(vm);
 }
 
 static ObjString* concatenate(VM* vm) {
@@ -148,7 +189,7 @@ static ObjString* concatenate(VM* vm) {
 static bool callClosure(VM* vm, ObjClosure* closure, uint8_t argCount) {
 
 	if (argCount != closure->function->arity) {
-		runtimeError(vm, "Expected %d arguments but got %d.", closure->function->arity, argCount);
+		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_ARITY], "Expected %d arguments but got %d.", closure->function->arity, argCount);
 		return false;
 	}
 
@@ -156,7 +197,7 @@ static bool callClosure(VM* vm, ObjClosure* closure, uint8_t argCount) {
 	// Despite the VM having a dynamic array of frames,
 	// We want to have stack overflows happen after a reasonable amount
 	if (vm->frames.length == 1024) {
-		runtimeError(vm, "Stack Overflow");
+		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_STACK_OVERFLOW], "Stack Overflow (%d frames)", 1024);
 		return false;
 	}
 
@@ -167,6 +208,9 @@ static bool callClosure(VM* vm, ObjClosure* closure, uint8_t argCount) {
 	frame->closure = closure;
 	frame->ip = closure->function->chunk.bytecode.items;
 	frame->slotsOffset = vm->stack.length - argCount - 1;
+	frame->isTryBlock = false;
+	frame->catchLocation = NULL;
+	frame->tryStackOffset = 0;
 	return true;
 }
 
@@ -178,11 +222,11 @@ static bool callValue(VM* vm, Value callee, uint8_t argCount) {
 				vm->stack.items[vm->stack.length - argCount - 1] = OBJ_VAL(newInstance(vm, clazz));
 
 				Value initializer;
-				if (tableGet(&clazz->methods, vm->newString, &initializer)) {
+				if (tableGet(&clazz->methods, vm->internalStrings[INTERNAL_STR_NEW], &initializer)) {
 					return callClosure(vm, AS_CLOSURE(initializer), argCount);
 				}
 				else if (argCount != 0) {
-					runtimeError(vm, "Expected 0 arguments but got %d", argCount);
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_ARITY], "Expected 0 arguments but got %d", argCount);
 					return false;
 				}
 
@@ -208,7 +252,7 @@ static bool callValue(VM* vm, Value callee, uint8_t argCount) {
 			default: break; // Not a callable type
 		}
 	}
-	runtimeError(vm, "Can only call functions");
+	throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Non-callable type");
 	return false;
 }
 
@@ -272,7 +316,7 @@ static bool bindMethod(VM* vm, ObjClass* clazz, ObjString* name) {
 static bool invokeFromClass(VM* vm, ObjClass* clazz, ObjString* name, uint8_t argCount) {
 	Value method;
 	if (!tableGet(&clazz->methods, name, &method)) {
-		runtimeError(vm, "Undefined property '%s'", name->str);
+		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_PROPERTY], "Undefined property '%s'", name->str);
 		return false;
 	}
 	return callClosure(vm, AS_CLOSURE(method), argCount);
@@ -282,7 +326,7 @@ static bool invoke(VM* vm, ObjString* name, uint8_t argCount) {
 	Value receiver = peek(vm, argCount);
 
 	if (!IS_INSTANCE(receiver)) {
-		runtimeError(vm, "Only instances have methods");
+		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Only instances have methods");
 		return false;
 	}
 
@@ -299,7 +343,7 @@ static bool invoke(VM* vm, ObjString* name, uint8_t argCount) {
 
 static bool validateIndex(VM* vm, size_t length, double index, size_t* realIndex) {
 	if (floor(index) != index) {
-		runtimeError(vm, "List index must be an integer (got %g)", index);
+		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_INDEX_RANGE], "List index must be an integer (got %g)", index);
 		return false;
 	}
 
@@ -310,7 +354,7 @@ static bool validateIndex(VM* vm, size_t length, double index, size_t* realIndex
 	absIndex = signedIndex < 0 ? length - -signedIndex : signedIndex;
 
 	if (absIndex >= length || absIndex < 0) {
-		runtimeError(vm, "List index '%" PRId64 "' out of range for list of length '%zu'", signedIndex, length);
+		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_INDEX_RANGE], "List index '%" PRId64 "' out of range for list of length '%zu'", signedIndex, length);
 		return false;
 	}
 
@@ -329,8 +373,8 @@ InterpreterResult executeVM(VM* vm) {
 
 #define BINARY_OP(valueType, op) do { \
 	if (!IS_NUMBER(peek(vm, 0)) || !IS_NUMBER(peek(vm, 1))) { \
-		runtimeError(vm, "Operands must be numbers."); \
-		return INTERPRETER_RUNTIME_ERROR; \
+		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Operands must be numbers"); \
+		break; \
 	} \
 	double b = AS_NUMBER(pop(vm)); \
 	double a = AS_NUMBER(pop(vm)); \
@@ -342,6 +386,81 @@ InterpreterResult executeVM(VM* vm) {
 #endif
 
 	for (;;) {
+
+		if (vm->hasException) {
+			ValueArray stackTraceArray;
+			initValueArray(&stackTraceArray);
+
+			ObjList* stackTrace = newList(vm, stackTraceArray);
+
+			push(vm, OBJ_VAL(stackTrace));
+			while (vm->hasException) {
+
+				if (frame->isTryBlock) {
+					frame->ip = frame->catchLocation;
+					frame->isTryBlock = false;
+					frame->catchLocation = NULL;
+
+					if (IS_INSTANCE(vm->exception) && instanceof(AS_INSTANCE(vm->exception), vm->internalExceptions[INTERNAL_EXCEPTION_BASE])) {
+						tableSet(vm, &AS_INSTANCE(vm->exception)->fields, vm->internalStrings[INTERNAL_STR_STACKTRACE], peek(vm, 0));
+					}
+
+					pop(vm);
+					vm->hasException = false;
+					// Reset to have a stack effect of 0
+					vm->stack.length = frame->tryStackOffset;
+					break;
+				}
+
+				ObjFunction* function = frame->closure->function;
+				size_t instruction = frame->ip - function->chunk.bytecode.items - 1;
+
+				ObjString* tracer = makeStringf(vm, "[%zu] in %s", getLineOfInstruction(&function->chunk, instruction), function->name != NULL ? function->name->str : "<script>");
+				push(vm, OBJ_VAL(tracer));
+				writeValueArray(vm, &stackTrace->items, peek(vm, 0));
+				pop(vm);
+
+				closeUpvalues(vm, &vm->stack.items[frame->slotsOffset]);
+
+				vm->frames.length--;
+
+				if (vm->frames.length == 0) {
+					pop(vm); // Stack Trace
+					pop(vm); // The script function
+					
+					if (IS_INSTANCE(vm->exception) && instanceof(AS_INSTANCE(vm->exception), vm->internalExceptions[INTERNAL_EXCEPTION_BASE])) {
+						ObjInstance* exception = AS_INSTANCE(vm->exception);
+						printf("%s: ", exception->clazz->name->str);
+
+						Value reason;
+						if (tableGet(&exception->fields, vm->internalStrings[INTERNAL_STR_REASON], &reason)) {
+							printValue(vm, reason);
+							printf("\n");
+						}
+						else {
+							printf("Exception thrown without reason\n");
+						}
+					}
+					else {
+						printf("Exception: ");
+						printValue(vm, vm->exception);
+						printf("\n");
+					}
+					
+					for (size_t i = 0; i < stackTrace->items.length; i++) {
+						printf("%s\n", AS_CSTRING(stackTrace->items.items[i]));
+					}
+
+					return INTERPRETER_RUNTIME_ERROR;
+				}
+
+				vm->stack.length = frame->slotsOffset;
+				// Repush after adjustment to keep on the stack
+				push(vm, OBJ_VAL(stackTrace));
+
+				frame = &vm->frames.items[vm->frames.length - 1];
+			}
+		}
 
 #ifdef FELINE_DEBUG_TRACE_INSTRUCTIONS
 		printf(" [ ");
@@ -381,8 +500,8 @@ InterpreterResult executeVM(VM* vm) {
 				ObjString* name = READ_STRING();
 				Value value;
 				if (!tableGet(&vm->globals, name, &value)) {
-					runtimeError(vm, "Undefined variable '%s'", name->str);
-					return INTERPRETER_RUNTIME_ERROR;
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_UNDEFINED_VARIABLE], "Undefined variable '%s'", name->str);
+					break;
 				}
 				push(vm, value);
 				break;
@@ -393,8 +512,8 @@ InterpreterResult executeVM(VM* vm) {
 
 				if (tableSet(vm, &vm->globals, name, peek(vm, 0))) {
 					tableDelete(vm, &vm->globals, name);
-					runtimeError(vm, "Undefined variable '%s'", name->str);
-					return INTERPRETER_RUNTIME_ERROR;
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_UNDEFINED_VARIABLE], "Undefined variable '%s'", name->str);
+					break;
 				}
 
 				break;
@@ -470,8 +589,8 @@ InterpreterResult executeVM(VM* vm) {
 
 			case OP_NEGATE: {
 				if (!IS_NUMBER(peek(vm, 0))) {
-					runtimeError(vm, "Operand must be a number");
-					return INTERPRETER_RUNTIME_ERROR;
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Operand must be a number");
+					break;
 				}
 				push(vm, NUMBER_VAL(-AS_NUMBER(pop(vm))));
 				break;
@@ -511,8 +630,8 @@ InterpreterResult executeVM(VM* vm) {
 					push(vm, NUMBER_VAL(a + b));
 				}
 				else {
-					runtimeError(vm, "Operands must be strings or numbers");
-					return INTERPRETER_RUNTIME_ERROR;
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Operands must be strings or numbers");
+					break;
 				}
 				break;
 			}
@@ -542,7 +661,7 @@ InterpreterResult executeVM(VM* vm) {
 			case OP_CALL: {
 				uint8_t argCount = READ_BYTE();
 				if (!callValue(vm, peek(vm, argCount), argCount)) {
-					return INTERPRETER_RUNTIME_ERROR;
+					break;
 				}
 				frame = &vm->frames.items[vm->frames.length - 1];
 				break;
@@ -577,13 +696,13 @@ InterpreterResult executeVM(VM* vm) {
 				Value superclass = peek(vm, 1);
 
 				if (!IS_CLASS(superclass)) {
-					runtimeError(vm, "Superclass must be a class");
-					return INTERPRETER_RUNTIME_ERROR;
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Superclass must be a class");
+					break;
 				}
 
 				ObjClass* subclass = AS_CLASS(peek(vm, 0));
 
-				tableAddAll(vm, &AS_CLASS(superclass)->methods, &subclass->methods);
+				inheritClasses(vm, subclass, AS_CLASS(superclass));
 				pop(vm);
 
 				break;
@@ -596,8 +715,8 @@ InterpreterResult executeVM(VM* vm) {
 
 			case OP_ACCESS_PROPERTY: {
 				if (!IS_INSTANCE(peek(vm, 0))) {
-					runtimeError(vm, "Only instances have properties");
-					return INTERPRETER_RUNTIME_ERROR;
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Only instances have properties");
+					break;
 				}
 
 				ObjInstance* instance = AS_INSTANCE(peek(vm, 0));
@@ -611,8 +730,8 @@ InterpreterResult executeVM(VM* vm) {
 				}
 
 				if (!bindMethod(vm, instance->clazz, name)) {
-					runtimeError(vm, "Undefined property '%s'", name->str);
-					return INTERPRETER_RUNTIME_ERROR;
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_PROPERTY], "Undefined property '%s'", name->str);
+					break;
 				}
 
 				break;
@@ -620,8 +739,8 @@ InterpreterResult executeVM(VM* vm) {
 
 			case OP_ASSIGN_PROPERTY: {
 				if (!IS_INSTANCE(peek(vm, 1))) {
-					runtimeError(vm, "Only instances have fields");
-					return INTERPRETER_RUNTIME_ERROR;
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Only instances have fields");
+					break;
 				}
 
 				ObjInstance* instance = AS_INSTANCE(peek(vm, 1));
@@ -637,7 +756,7 @@ InterpreterResult executeVM(VM* vm) {
 				ObjClass* superclass = AS_CLASS(pop(vm));
 
 				if (!bindMethod(vm, superclass, name)) {
-					return INTERPRETER_RUNTIME_ERROR;
+					break;
 				}
 				break;
 			}
@@ -647,7 +766,7 @@ InterpreterResult executeVM(VM* vm) {
 				uint8_t argCount = READ_BYTE();
 
 				if (!invoke(vm, method, argCount)) {
-					return INTERPRETER_RUNTIME_ERROR;
+					break;
 				}
 				frame = &vm->frames.items[vm->frames.length - 1];
 				break;
@@ -660,7 +779,7 @@ InterpreterResult executeVM(VM* vm) {
 				ObjClass* superclass = AS_CLASS(pop(vm));
 
 				if (!invokeFromClass(vm, superclass, method, argCount)) {
-					return INTERPRETER_RUNTIME_ERROR;
+					break;
 				}
 				frame = &vm->frames.items[vm->frames.length - 1];
 				break;
@@ -672,13 +791,18 @@ InterpreterResult executeVM(VM* vm) {
 				ValueArray items;
 				initValueArray(&items);
 
+				ObjList* list = newList(vm, items);
+
+				push(vm, OBJ_VAL(list));
+
 				for (size_t i = 0; i < length; i++) {
-					writeValueArray(vm, &items, peek(vm, length - i - 1));
+					writeValueArray(vm, &list->items, peek(vm, length - i));
 				}
+				pop(vm);
 
 				vm->stack.length -= length;
 
-				push(vm, OBJ_VAL(newList(vm, items)));
+				push(vm, OBJ_VAL(list));
 				break;
 			}
 
@@ -690,13 +814,13 @@ InterpreterResult executeVM(VM* vm) {
 					ObjList* list = AS_LIST(indexee);
 
 					if (!IS_NUMBER(index)) {
-						runtimeError(vm, "List index must be a number");
-						return INTERPRETER_RUNTIME_ERROR;
+						throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_INDEX_RANGE], "List index must be a number");
+						break;
 					}
 
 					size_t realIndex;
 					if (!validateIndex(vm, list->items.length, AS_NUMBER(index), &realIndex)) {
-						return INTERPRETER_RUNTIME_ERROR;
+						break;
 					}
 
 					pop(vm);
@@ -705,8 +829,8 @@ InterpreterResult executeVM(VM* vm) {
 
 				}
 				else {
-					runtimeError(vm, "Invalid subscript target");
-					return INTERPRETER_RUNTIME_ERROR;
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Invalid subscript target");
+					break;
 				}
 
 				break;
@@ -721,13 +845,13 @@ InterpreterResult executeVM(VM* vm) {
 					ObjList* list = AS_LIST(indexee);
 
 					if (!IS_NUMBER(index)) {
-						runtimeError(vm, "List index must be a number");
-						return INTERPRETER_RUNTIME_ERROR;
+						throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "List index must be a number");
+						break;
 					}
 
 					size_t realIndex;
 					if (!validateIndex(vm, list->items.length, AS_NUMBER(index), &realIndex)) {
-						return INTERPRETER_RUNTIME_ERROR;
+						break;
 					}
 
 					list->items.items[realIndex] = value;
@@ -738,13 +862,38 @@ InterpreterResult executeVM(VM* vm) {
 					push(vm, value);
 				}
 				else {
-					runtimeError(vm, "Invalid subscript target");
-					return INTERPRETER_RUNTIME_ERROR;
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Invalid subscript target");
+					break;
 				}
 
 				break;
 			}
 
+			case OP_THROW: {
+				vm->exception = pop(vm);
+				vm->hasException = true;
+				break;
+			}
+
+			case OP_TRY_BEGIN: {
+				uint16_t catchJump = READ_SHORT();
+				frame->catchLocation = frame->ip + catchJump;
+				frame->isTryBlock = true;
+				frame->tryStackOffset = vm->stack.length;
+				break;
+			}
+
+			case OP_TRY_END: {
+				frame->catchLocation = NULL;
+				frame->isTryBlock = false;
+				frame->tryStackOffset = 0;
+				break;
+			}
+
+			case OP_BOUND_EXCEPTION: {
+				push(vm, vm->exception);
+				break;
+			}
 		}
 
 	}

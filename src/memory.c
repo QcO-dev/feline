@@ -77,7 +77,16 @@ static void markRoots(VM* vm) {
 	markTable(vm, &vm->globals);
 
 	markCompilerRoots(vm);
-	markObject(vm, (Obj*)vm->newString);
+	
+	for (size_t i = 0; i < INTERNAL_STR__COUNT; i++) {
+		markObject(vm, (Obj*)vm->internalStrings[i]);
+	}
+
+	for (size_t i = 0; i < INTERNAL_EXCEPTION__COUNT; i++) {
+		markObject(vm, (Obj*)vm->internalExceptions[i]);
+	}
+
+	markValue(vm, vm->exception);
 }
 
 static void markArray(VM* vm, ValueArray* array) {
@@ -115,6 +124,7 @@ static void blackenObject(VM* vm, Obj* object) {
 		case OBJ_CLASS: {
 			ObjClass* clazz = (ObjClass*)object;
 			markObject(vm, (Obj*)clazz->name);
+			markObject(vm, (Obj*)clazz->superclass);
 			markTable(vm, &clazz->methods);
 			break;
 		}

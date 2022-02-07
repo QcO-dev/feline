@@ -25,7 +25,7 @@ static size_t shortInstruction(const char* name, VM* vm, Chunk* chunk, size_t of
 static size_t jumpInstruction(const char* name, int64_t sign, VM* vm, Chunk* chunk, size_t offset) {
 	uint16_t jump = ((chunk->bytecode.items[offset + 1] << 8) | (chunk->bytecode.items[offset + 2]));
 
-	printf("%-15s %4zu -> %zu", name, offset, offset + 3 + sign * jump);
+	printf("%-15s %4zx -> %zx", name, offset, offset + 3 + sign * jump);
 
 	return offset + 3;
 }
@@ -127,6 +127,11 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 		SHORT(LIST)
 		SIMPLE(ACCESS_SUBSCRIPT)
 		SIMPLE(ASSIGN_SUBSCRIPT)
+
+		SIMPLE(THROW)
+		JUMP(TRY_BEGIN, 1)
+		SIMPLE(TRY_END)
+		SIMPLE(BOUND_EXCEPTION)
 
 		SIMPLE(PRINT)
 		default: {

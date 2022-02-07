@@ -132,12 +132,21 @@ static Token number(Lexer* lexer) {
 
 static TokenType identifierType(Lexer* lexer) {
 	switch (lexer->start[0]) {
-		case 'c': return checkKeyword(lexer, 1, 4, "lass", TOKEN_CLASS);
+		case 'c': {
+			if (lexer->current - lexer->start > 1) {
+				switch (lexer->start[1]) {
+					case 'a': return checkKeyword(lexer, 2, 3, "tch", TOKEN_CATCH);
+					case 'l': return checkKeyword(lexer, 2, 3, "ass", TOKEN_CLASS);
+				}
+			}
+			break;
+		}
 		case 'e': return checkKeyword(lexer, 1, 3, "lse", TOKEN_ELSE);
 		case 'f': {
 			if (lexer->current - lexer->start > 1) {
 				switch (lexer->start[1]) {
 					case 'a': return checkKeyword(lexer, 2, 3, "lse", TOKEN_FALSE);
+					case 'i': return checkKeyword(lexer, 2, 5, "nally", TOKEN_FINALLY);
 					case 'o': return checkKeyword(lexer, 2, 1, "r", TOKEN_FOR);
 					case 'u': return checkKeyword(lexer, 2, 6, "nction", TOKEN_FUNCTION);
 				}
@@ -152,8 +161,24 @@ static TokenType identifierType(Lexer* lexer) {
 		case 't': {
 			if (lexer->current - lexer->start > 1) {
 				switch (lexer->start[1]) {
-					case 'h': return checkKeyword(lexer, 2, 2, "is", TOKEN_THIS);
-					case 'r': return checkKeyword(lexer, 2, 2, "ue", TOKEN_TRUE);
+					case 'h': {
+						if (lexer->current - lexer->start > 2) {
+							switch (lexer->start[2]) {
+								case 'i': return checkKeyword(lexer, 3, 1, "s", TOKEN_THIS);
+								case 'r': return checkKeyword(lexer, 3, 2, "ow", TOKEN_THROW);
+							}
+						}
+						break;
+					}
+					case 'r': {
+						if (lexer->current - lexer->start > 2) {
+							switch (lexer->start[2]) {
+								case 'u': return checkKeyword(lexer, 3, 1, "e", TOKEN_TRUE);
+								case 'y': return checkKeyword(lexer, 3, 0, "", TOKEN_TRY);
+							}
+						}
+						break;
+					}
 				}
 			}
 			break;
