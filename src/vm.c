@@ -56,6 +56,8 @@ static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
 void buildInternalStrings(VM* vm) {
 	vm->internalStrings[INTERNAL_STR_NEW] = copyString(vm, "new", 3);
 	vm->internalStrings[INTERNAL_STR_STACKTRACE] = copyString(vm, "stackTrace", 10);
+	vm->internalStrings[INTERNAL_STR_EXCEPTION] = copyString(vm, "Exception", 9);
+	vm->internalStrings[INTERNAL_STR_REASON] = copyString(vm, "reason", 6);
 }
 
 void initVM(VM* vm) {
@@ -72,6 +74,7 @@ void initVM(VM* vm) {
 	vm->lowestLevelCompiler = NULL;
 	
 	for (size_t i = 0; i < INTERNAL_STR__COUNT; i++) vm->internalStrings[i] = NULL;
+	for (size_t i = 0; i < INTERNAL_EXCEPTION__COUNT; i++) vm->internalExceptions[i] = NULL;
 
 	vm->hasException = false;
 	vm->exception = NULL_VAL;
@@ -86,6 +89,8 @@ void initVM(VM* vm) {
 	pop(vm);
 
 	buildInternalStrings(vm);
+
+	defineExceptionClasses(vm);
 
 	defineNative(vm, "clock", clockNative);
 	defineNative(vm, "len", lenNative);
@@ -109,6 +114,22 @@ Value pop(VM* vm) {
 
 Value peek(VM* vm, size_t distance) {
 	return vm->stack.items[vm->stack.length - 1 - distance];
+}
+
+void inheritClasses(VM* vm, ObjClass* subclass, ObjClass* superclass) {
+	tableAddAll(vm, &superclass->methods, &subclass->methods);
+	subclass->superclass = superclass;
+}
+
+bool instanceof(ObjInstance* instance, ObjClass* clazz) {
+	ObjClass* parent = instance->clazz;
+	while (parent != NULL) {
+		if (parent == clazz) {
+			return true;
+		}
+		parent = parent->superclass;
+	}
+	return false;
 }
 
 static void resetStack(VM* vm) {
@@ -367,8 +388,7 @@ InterpreterResult executeVM(VM* vm) {
 					frame->isTryBlock = false;
 					frame->catchLocation = NULL;
 
-					//TODO: Instance of an exception should get stackTrace
-					if (IS_INSTANCE(vm->exception)) {
+					if (IS_INSTANCE(vm->exception) && instanceof(AS_INSTANCE(vm->exception), vm->internalExceptions[INTERNAL_EXCEPTION_BASE])) {
 						tableSet(vm, &AS_INSTANCE(vm->exception)->fields, vm->internalStrings[INTERNAL_STR_STACKTRACE], peek(vm, 0));
 					}
 
@@ -392,9 +412,25 @@ InterpreterResult executeVM(VM* vm) {
 				if (vm->frames.length == 0) {
 					pop(vm); // Stack Trace
 					pop(vm); // The script function
-					printf("Exception - ");
-					printValue(vm, vm->exception);
-					printf("\n");
+					
+					if (IS_INSTANCE(vm->exception) && instanceof(AS_INSTANCE(vm->exception), vm->internalExceptions[INTERNAL_EXCEPTION_BASE])) {
+						ObjInstance* exception = AS_INSTANCE(vm->exception);
+						printf("%s: ", exception->clazz->name->str);
+
+						Value reason;
+						if (tableGet(&exception->fields, vm->internalStrings[INTERNAL_STR_REASON], &reason)) {
+							printValue(vm, reason);
+							printf("\n");
+						}
+						else {
+							printf("Exception thrown without reason\n");
+						}
+					}
+					else {
+						printf("Exception: ");
+						printValue(vm, vm->exception);
+						printf("\n");
+					}
 					
 					for (size_t i = 0; i < stackTrace->items.length; i++) {
 						printf("%s\n", AS_CSTRING(stackTrace->items.items[i]));
@@ -651,7 +687,7 @@ InterpreterResult executeVM(VM* vm) {
 
 				ObjClass* subclass = AS_CLASS(peek(vm, 0));
 
-				tableAddAll(vm, &AS_CLASS(superclass)->methods, &subclass->methods);
+				inheritClasses(vm, subclass, AS_CLASS(superclass));
 				pop(vm);
 
 				break;

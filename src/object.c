@@ -73,6 +73,7 @@ ObjNative* newNative(VM* vm, NativeFunction function) {
 ObjClass* newClass(VM* vm, ObjString* name) {
 	ObjClass* clazz = ALLOCATE_OBJ(vm, ObjClass, OBJ_CLASS);
 	clazz->name = name;
+	clazz->superclass = NULL;
 	initTable(&clazz->methods);
 	return clazz;
 }
