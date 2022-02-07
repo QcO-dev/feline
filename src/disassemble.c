@@ -129,6 +129,8 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 		SIMPLE(ASSIGN_SUBSCRIPT)
 
 		SIMPLE(THROW)
+		JUMP(TRY_BEGIN, 1)
+		SIMPLE(TRY_END)
 
 		SIMPLE(PRINT)
 		default: {

@@ -810,6 +810,37 @@ static void throwStatement(Compiler* compiler) {
 	emitByte(compiler, OP_THROW);
 }
 
+static void tryStatement(Compiler* compiler) {
+	// try ...
+	size_t tryBegin = emitJump(compiler, OP_TRY_BEGIN);
+
+	statement(compiler);
+
+	size_t catchJump = emitJump(compiler, OP_JUMP);
+
+	emitByte(compiler, OP_TRY_END);
+	// catch(e) ...
+
+	consume(compiler, TOKEN_CATCH, "Expected catch after try statement");
+
+	beginScope(compiler);
+
+	patchJump(compiler, tryBegin);
+
+	consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after catch");
+
+	uint16_t boundCatchVariable = parseVariable(compiler, "Expected catch binding name");
+	defineVariable(compiler, boundCatchVariable);
+
+	consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after catch variable");
+
+	statement(compiler);
+
+	endScope(compiler);
+
+	patchJump(compiler, catchJump);
+}
+
 static void expressionStatement(Compiler* compiler) {
 	expression(compiler);
 	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after expression");
@@ -839,6 +870,9 @@ static void statement(Compiler* compiler) {
 	}
 	else if (match(compiler, TOKEN_THROW)) {
 		throwStatement(compiler);
+	}
+	else if (match(compiler, TOKEN_TRY)) {
+		tryStatement(compiler);
 	}
 	else if (match(compiler, TOKEN_WHILE)) {
 		whileStatement(compiler);
@@ -1047,6 +1081,7 @@ ParseRule rules[] = {
 	[TOKEN_NUMBER] = {number, NULL, PREC_NONE},
 
 	[TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
+	[TOKEN_CATCH] = {NULL, NULL, PREC_NONE},
 	[TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
 	[TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FALSE] = {literal, NULL, PREC_NONE},
@@ -1060,6 +1095,7 @@ ParseRule rules[] = {
 	[TOKEN_THIS] = {this_, NULL, PREC_NONE},
 	[TOKEN_THROW] = {NULL, NULL, PREC_NONE},
 	[TOKEN_TRUE] = {literal, NULL, PREC_NONE},
+	[TOKEN_TRY] = {NULL, NULL, PREC_NONE},
 	[TOKEN_VAR] = {NULL, NULL, PREC_NONE},
 	[TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
 
@@ -1067,7 +1103,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(45 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(47 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(TokenType type) {
 	return &rules[type];

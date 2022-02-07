@@ -10,6 +10,9 @@ typedef struct CallFrame {
 	ObjClosure* closure;
 	uint8_t* ip;
 	size_t slotsOffset;
+
+	uint8_t* catchLocation;
+	bool isTryBlock;
 } CallFrame;
 
 DECLARE_DYNAMIC_ARRAY(CallFrame, CallFrame)

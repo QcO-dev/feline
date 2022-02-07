@@ -169,6 +169,8 @@ static bool callClosure(VM* vm, ObjClosure* closure, uint8_t argCount) {
 	frame->closure = closure;
 	frame->ip = closure->function->chunk.bytecode.items;
 	frame->slotsOffset = vm->stack.length - argCount - 1;
+	frame->isTryBlock = false;
+	frame->catchLocation = NULL;
 	return true;
 }
 
@@ -353,6 +355,15 @@ InterpreterResult executeVM(VM* vm) {
 
 			push(vm, OBJ_VAL(stackTrace));
 			while (vm->hasException) {
+
+				if (frame->isTryBlock) {
+					frame->ip = frame->catchLocation;
+					pop(vm);
+					push(vm, vm->exception);
+					vm->hasException = false;
+					break;
+				}
+
 				ObjFunction* function = frame->closure->function;
 				size_t instruction = frame->ip - function->chunk.bytecode.items - 1;
 
@@ -368,7 +379,9 @@ InterpreterResult executeVM(VM* vm) {
 				if (vm->frames.length == 0) {
 					pop(vm); // Stack Trace
 					pop(vm); // The script function
-					printf("Exception\n");
+					printf("Exception - ");
+					printValue(vm, vm->exception);
+					printf("\n");
 					
 					for (size_t i = 0; i < stackTrace->items.length; i++) {
 						printf("%s\n", AS_CSTRING(stackTrace->items.items[i]));
@@ -798,6 +811,18 @@ InterpreterResult executeVM(VM* vm) {
 				break;
 			}
 
+			case OP_TRY_BEGIN: {
+				uint16_t catchJump = READ_SHORT();
+				frame->catchLocation = frame->ip + catchJump;
+				frame->isTryBlock = true;
+				break;
+			}
+
+			case OP_TRY_END: {
+				frame->catchLocation = NULL;
+				frame->isTryBlock = false;
+				break;
+			}
 		}
 
 	}
