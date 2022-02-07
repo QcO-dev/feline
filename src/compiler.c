@@ -863,13 +863,13 @@ static void tryStatement(Compiler* compiler) {
 
 	beginScope(compiler);
 
-	consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after catch");
+	if (match(compiler, TOKEN_LEFT_PAREN)) {
+		uint16_t boundCatchVariable = parseVariable(compiler, "Expected catch binding name");
+		emitByte(compiler, OP_BOUND_EXCEPTION);
+		defineVariable(compiler, boundCatchVariable);
 
-	uint16_t boundCatchVariable = parseVariable(compiler, "Expected catch binding name");
-	emitByte(compiler, OP_BOUND_EXCEPTION);
-	defineVariable(compiler, boundCatchVariable);
-
-	consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after catch variable");
+		consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after catch variable");
+	}
 
 	statement(compiler);
 

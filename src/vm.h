@@ -13,6 +13,7 @@ typedef struct CallFrame {
 	size_t slotsOffset;
 
 	uint8_t* catchLocation;
+	size_t tryStackOffset;
 	bool isTryBlock;
 } CallFrame;
 

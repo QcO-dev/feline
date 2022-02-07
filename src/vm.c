@@ -210,6 +210,7 @@ static bool callClosure(VM* vm, ObjClosure* closure, uint8_t argCount) {
 	frame->slotsOffset = vm->stack.length - argCount - 1;
 	frame->isTryBlock = false;
 	frame->catchLocation = NULL;
+	frame->tryStackOffset = 0;
 	return true;
 }
 
@@ -406,6 +407,8 @@ InterpreterResult executeVM(VM* vm) {
 
 					pop(vm);
 					vm->hasException = false;
+					// Reset to have a stack effect of 0
+					vm->stack.length = frame->tryStackOffset;
 					break;
 				}
 
@@ -876,12 +879,14 @@ InterpreterResult executeVM(VM* vm) {
 				uint16_t catchJump = READ_SHORT();
 				frame->catchLocation = frame->ip + catchJump;
 				frame->isTryBlock = true;
+				frame->tryStackOffset = vm->stack.length;
 				break;
 			}
 
 			case OP_TRY_END: {
 				frame->catchLocation = NULL;
 				frame->isTryBlock = false;
+				frame->tryStackOffset = 0;
 				break;
 			}
 
