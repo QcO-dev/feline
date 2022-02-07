@@ -876,6 +876,10 @@ static void tryStatement(Compiler* compiler) {
 	endScope(compiler);
 
 	patchJump(compiler, catchJump);
+
+	if (match(compiler, TOKEN_FINALLY)) {
+		statement(compiler);
+	}
 }
 
 static void expressionStatement(Compiler* compiler) {
@@ -1122,6 +1126,7 @@ ParseRule rules[] = {
 	[TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
 	[TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FALSE] = {literal, NULL, PREC_NONE},
+	[TOKEN_FINALLY] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FOR] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FUNCTION] = {NULL, NULL, PREC_NONE},
 	[TOKEN_IF] = {NULL, NULL, PREC_NONE},
@@ -1140,7 +1145,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(47 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(48 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(TokenType type) {
 	return &rules[type];

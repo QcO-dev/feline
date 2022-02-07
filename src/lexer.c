@@ -146,6 +146,7 @@ static TokenType identifierType(Lexer* lexer) {
 			if (lexer->current - lexer->start > 1) {
 				switch (lexer->start[1]) {
 					case 'a': return checkKeyword(lexer, 2, 3, "lse", TOKEN_FALSE);
+					case 'i': return checkKeyword(lexer, 2, 5, "nally", TOKEN_FINALLY);
 					case 'o': return checkKeyword(lexer, 2, 1, "r", TOKEN_FOR);
 					case 'u': return checkKeyword(lexer, 2, 6, "nction", TOKEN_FUNCTION);
 				}
