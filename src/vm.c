@@ -358,6 +358,8 @@ InterpreterResult executeVM(VM* vm) {
 
 				if (frame->isTryBlock) {
 					frame->ip = frame->catchLocation;
+					frame->isTryBlock = false;
+					frame->catchLocation = NULL;
 					pop(vm);
 					push(vm, vm->exception);
 					vm->hasException = false;
