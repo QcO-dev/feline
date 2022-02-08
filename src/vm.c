@@ -828,6 +828,29 @@ InterpreterResult executeVM(VM* vm) {
 					push(vm, list->items.items[realIndex]);
 
 				}
+				else if (IS_INSTANCE(indexee)) {
+					ObjInstance* instance = AS_INSTANCE(indexee);
+
+					if (!IS_STRING(index)) {
+						throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_PROPERTY], "Property name must be a string in subscript");
+						break;
+					}
+
+					ObjString* propertyName = AS_STRING(index);
+
+					Value value;
+					if (tableGet(&instance->fields, propertyName, &value)) {
+						pop(vm);
+						pop(vm);
+						push(vm, value);
+						break;
+					}
+
+					pop(vm); // Pop the propertyName off
+					if (!bindMethod(vm, instance->clazz, propertyName)) {
+						push(vm, NULL_VAL);
+					}
+				}
 				else {
 					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Invalid subscript target");
 					break;
