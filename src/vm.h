@@ -30,8 +30,14 @@ typedef enum InternalString {
 	INTERNAL_STR_UNDEFINED_VARIABLE_EXCEPTION,
 	INTERNAL_STR_STACK_OVERFLOW_EXCEPTION,
 	INTERNAL_STR_REASON,
+	INTERNAL_STR_OBJECT,
 	INTERNAL_STR__COUNT
 } InternalString;
+
+typedef enum InternalClassType {
+	INTERNAL_CLASS_OBJECT,
+	INTERNAL_CLASS__COUNT
+} InternalClassType;
 
 typedef struct VM {
 	ValueArray stack;
@@ -45,6 +51,7 @@ typedef struct VM {
 
 	ObjString* internalStrings[INTERNAL_STR__COUNT];
 	ObjClass* internalExceptions[INTERNAL_EXCEPTION__COUNT];
+	ObjClass* internalClasses[INTERNAL_CLASS__COUNT];
 
 	Compiler* lowestLevelCompiler;
 	ObjUpvalue* openUpvalues;

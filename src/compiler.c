@@ -29,7 +29,6 @@ typedef enum FunctionType {
 
 typedef struct ClassCompiler {
 	struct ClassCompiler* enclosing;
-	bool hasSuperclass;
 } ClassCompiler;
 
 typedef struct Compiler {
@@ -507,9 +506,13 @@ static void number(Compiler* compiler, bool canAssign) {
 	emitConstant(compiler, NUMBER_VAL(value));
 }
 
+static ObjString* normString(Compiler* compiler, Token strToken) {
+	return copyString(compiler->vm, strToken.start + 1, strToken.length - 2);
+}
+
 static void string(Compiler* compiler, bool canAssign) {
 	// The +1 and - 2 remove the double quotes from the lexeme
-	ObjString* str = copyString(compiler->vm, compiler->previous.start + 1, compiler->previous.length - 2);
+	ObjString* str = normString(compiler, compiler->previous);
 	emitConstant(compiler, OBJ_VAL(str));
 }
 
@@ -539,9 +542,6 @@ static void super_(Compiler* compiler, bool canAssign) {
 	if (compiler->currentClass == NULL) {
 		error(compiler, "Cannot use 'super' outside of a class");
 	}
-	else if (!compiler->currentClass->hasSuperclass) {
-		error(compiler, "Cannot use 'super' in a class without a superclass");
-	}
 
 	consume(compiler, TOKEN_DOT, "Expected '.' after 'super'");
 	consume(compiler, TOKEN_IDENTIFIER, "Expected superclass method name");
@@ -559,6 +559,48 @@ static void super_(Compiler* compiler, bool canAssign) {
 		namedVariable(compiler, syntheticToken("super"), false);
 		emitOOInstruction(compiler, OP_ACCESS_SUPER, name);
 	}
+}
+
+// ==== Object Property Assignment & Creation ( { ... } )
+
+static void objectPropertyAssign(Compiler* compiler, bool canAssign) {
+
+	if (!check(compiler, TOKEN_RIGHT_BRACE)) {
+		do {
+			uint16_t key;
+			if (match(compiler, TOKEN_STRING)) {
+				ObjString* str = normString(compiler, compiler->previous);
+				key = makeConstant(compiler, OBJ_VAL(str));
+
+				consume(compiler, TOKEN_COLON, "Expected ':' between key-value pair");
+
+				expression(compiler);
+			}
+			else {
+				consume(compiler, TOKEN_IDENTIFIER, "Expected identifier key for key-value pair");
+
+				Token keyToken = compiler->previous;
+				key = identifierConstant(compiler, &compiler->previous);
+
+				if (match(compiler, TOKEN_COLON)) {
+					expression(compiler);
+				}
+				else {
+					namedVariable(compiler, keyToken, false);
+				}
+			}
+
+			emitOOInstruction(compiler, OP_ASSIGN_PROPERTY_KV, key);
+		} while (match(compiler, TOKEN_COMMA));
+	}
+
+	consume(compiler, TOKEN_RIGHT_BRACE, "Expected '}' after object body");
+}
+
+static void objectCreation(Compiler* compiler, bool canAssign) {
+	emitByte(compiler, OP_CREATE_OBJECT);
+
+	objectPropertyAssign(compiler, canAssign);
 }
 
 // ==== Expression values ====
@@ -1007,27 +1049,27 @@ static void classDeclaration(Compiler* compiler) {
 	defineVariable(compiler, nameConstant);
 
 	ClassCompiler classCompiler;
-	classCompiler.hasSuperclass = false;
 	classCompiler.enclosing = compiler->currentClass;
 	compiler->currentClass = &classCompiler;
 
-	if (match(compiler, TOKEN_LESS)) {
+	if (match(compiler, TOKEN_COLON)) {
 		consume(compiler, TOKEN_IDENTIFIER, "Expected superclass name");
 		variable(compiler, false);
 
 		if (identifiersEqual(&className, &compiler->previous)) {
 			error(compiler, "A class cannot inherit from itself");
 		}
-
-		beginScope(compiler);
-		addLocal(compiler, syntheticToken("super"));
-		defineVariable(compiler, 0);
-
-		namedVariable(compiler, className, false);
-		emitByte(compiler, OP_INHERIT);
-
-		classCompiler.hasSuperclass = true;
 	}
+	else {
+		emitByte(compiler, OP_OBJECT);
+	}
+
+	beginScope(compiler);
+	addLocal(compiler, syntheticToken("super"));
+	defineVariable(compiler, 0);
+
+	namedVariable(compiler, className, false);
+	emitByte(compiler, OP_INHERIT);
 
 	namedVariable(compiler, className, false);
 
@@ -1041,9 +1083,7 @@ static void classDeclaration(Compiler* compiler) {
 
 	emitByte(compiler, OP_POP);
 
-	if (classCompiler.hasSuperclass) {
-		endScope(compiler);
-	}
+	endScope(compiler);
 
 	compiler->currentClass = compiler->currentClass->enclosing;
 }
@@ -1094,7 +1134,7 @@ static void declaration(Compiler* compiler) {
 ParseRule rules[] = {
 	[TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
 	[TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
-	[TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
+	[TOKEN_LEFT_BRACE] = {objectCreation, objectPropertyAssign, PREC_CALL},
 	[TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_LEFT_SQUARE] = {list, subscript, PREC_CALL},
 	[TOKEN_RIGHT_SQUARE] = {NULL, NULL, PREC_NONE},
@@ -1103,6 +1143,7 @@ ParseRule rules[] = {
 	[TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
 	[TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
 	[TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
+	[TOKEN_COLON] = {NULL, NULL, PREC_NONE},
 	[TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
 	[TOKEN_DOT] = {NULL, dot, PREC_CALL},
 	[TOKEN_BANG] = {unary, NULL, PREC_NONE},
@@ -1145,7 +1186,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(48 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(49 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(TokenType type) {
 	return &rules[type];

@@ -86,6 +86,10 @@ static void markRoots(VM* vm) {
 		markObject(vm, (Obj*)vm->internalExceptions[i]);
 	}
 
+	for (size_t i = 0; i < INTERNAL_CLASS__COUNT; i++) {
+		markObject(vm, (Obj*)vm->internalClasses[i]);
+	}
+
 	markValue(vm, vm->exception);
 }
 

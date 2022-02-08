@@ -12,6 +12,7 @@ void defineExceptionSubclass(VM* vm, InternalExceptionType type, InternalString 
 
 void defineExceptionClasses(VM* vm) {
 	vm->internalExceptions[INTERNAL_EXCEPTION_BASE] = newClass(vm, vm->internalStrings[INTERNAL_STR_EXCEPTION]);
+	inheritClasses(vm, vm->internalExceptions[INTERNAL_EXCEPTION_BASE], vm->internalClasses[INTERNAL_CLASS_OBJECT]);
 	tableSet(vm, &vm->globals, vm->internalStrings[INTERNAL_STR_EXCEPTION], OBJ_VAL(vm->internalExceptions[INTERNAL_EXCEPTION_BASE]));
 
 	defineExceptionSubclass(vm, INTERNAL_EXCEPTION_TYPE,               INTERNAL_STR_TYPE_EXCEPTION);
