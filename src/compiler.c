@@ -582,6 +582,12 @@ static void objectPropertyAssign(Compiler* compiler, bool canAssign) {
 	consume(compiler, TOKEN_RIGHT_BRACE, "Expected '}' after object body");
 }
 
+static void objectCreation(Compiler* compiler, bool canAssign) {
+	emitByte(compiler, OP_CREATE_OBJECT);
+
+	objectPropertyAssign(compiler, canAssign);
+}
+
 // ==== Expression values ====
 
 static void grouping(Compiler* compiler, bool canAssign) {
@@ -1115,7 +1121,7 @@ static void declaration(Compiler* compiler) {
 ParseRule rules[] = {
 	[TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
 	[TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
-	[TOKEN_LEFT_BRACE] = {NULL, objectPropertyAssign, PREC_CALL},
+	[TOKEN_LEFT_BRACE] = {objectCreation, objectPropertyAssign, PREC_CALL},
 	[TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_LEFT_SQUARE] = {list, subscript, PREC_CALL},
 	[TOKEN_RIGHT_SQUARE] = {NULL, NULL, PREC_NONE},

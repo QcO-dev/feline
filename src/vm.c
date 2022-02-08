@@ -2,6 +2,7 @@
 #include "compiler.h"
 #include "object.h"
 #include "memory.h"
+#include "builtin/objectclass.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -66,6 +67,8 @@ void buildInternalStrings(VM* vm) {
 	vm->internalStrings[INTERNAL_STR_STACK_OVERFLOW_EXCEPTION] = copyString(vm, "StackOverflowException", 22);
 
 	vm->internalStrings[INTERNAL_STR_REASON] = copyString(vm, "reason", 6);
+
+	vm->internalStrings[INTERNAL_STR_OBJECT] = copyString(vm, "Object", 6);
 }
 
 void initVM(VM* vm) {
@@ -83,6 +86,7 @@ void initVM(VM* vm) {
 	
 	for (size_t i = 0; i < INTERNAL_STR__COUNT; i++) vm->internalStrings[i] = NULL;
 	for (size_t i = 0; i < INTERNAL_EXCEPTION__COUNT; i++) vm->internalExceptions[i] = NULL;
+	for (size_t i = 0; i < INTERNAL_CLASS__COUNT; i++) vm->internalExceptions[i] = NULL;
 
 	vm->hasException = false;
 	vm->exception = NULL_VAL;
@@ -99,6 +103,8 @@ void initVM(VM* vm) {
 	buildInternalStrings(vm);
 
 	defineExceptionClasses(vm);
+
+	defineObjectClass(vm);
 
 	defineNative(vm, "clock", clockNative);
 	defineNative(vm, "len", lenNative);
@@ -793,6 +799,14 @@ InterpreterResult executeVM(VM* vm) {
 				if (!invokeFromClass(vm, superclass, method, argCount)) {
 					break;
 				}
+				frame = &vm->frames.items[vm->frames.length - 1];
+				break;
+			}
+
+			case OP_CREATE_OBJECT: {
+				// This could maybe be re-written to do the creation itself
+				// Which may result in a speed-up in tight loops
+				callValue(vm, OBJ_VAL(vm->internalClasses[INTERNAL_CLASS_OBJECT]), 0);
 				frame = &vm->frames.items[vm->frames.length - 1];
 				break;
 			}
