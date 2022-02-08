@@ -751,6 +751,18 @@ InterpreterResult executeVM(VM* vm) {
 				break;
 			}
 
+			case OP_ASSIGN_PROPERTY_KV: {
+				if (!IS_INSTANCE(peek(vm, 1))) {
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Only instances have fields");
+					break;
+				}
+
+				ObjInstance* instance = AS_INSTANCE(peek(vm, 1));
+				tableSet(vm, &instance->fields, READ_STRING(), peek(vm, 0));
+				pop(vm);
+				break;
+			}
+
 			case OP_ACCESS_SUPER: {
 				ObjString* name = READ_STRING();
 				ObjClass* superclass = AS_CLASS(pop(vm));

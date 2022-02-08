@@ -561,6 +561,27 @@ static void super_(Compiler* compiler, bool canAssign) {
 	}
 }
 
+// ==== Object Property Assignment & Creation ( { ... } )
+
+static void objectPropertyAssign(Compiler* compiler, bool canAssign) {
+
+	if (!check(compiler, TOKEN_RIGHT_BRACE)) {
+		do {
+			consume(compiler, TOKEN_IDENTIFIER, "Expected identifier key for key-value pair");
+
+			uint16_t key = identifierConstant(compiler, &compiler->previous);
+
+			consume(compiler, TOKEN_COLON, "Expected ':' between key and value");
+
+			expression(compiler);
+
+			emitOOInstruction(compiler, OP_ASSIGN_PROPERTY_KV, key);
+		} while (match(compiler, TOKEN_COMMA));
+	}
+
+	consume(compiler, TOKEN_RIGHT_BRACE, "Expected '}' after object body");
+}
+
 // ==== Expression values ====
 
 static void grouping(Compiler* compiler, bool canAssign) {
@@ -1011,7 +1032,7 @@ static void classDeclaration(Compiler* compiler) {
 	classCompiler.enclosing = compiler->currentClass;
 	compiler->currentClass = &classCompiler;
 
-	if (match(compiler, TOKEN_LESS)) {
+	if (match(compiler, TOKEN_COLON)) {
 		consume(compiler, TOKEN_IDENTIFIER, "Expected superclass name");
 		variable(compiler, false);
 
@@ -1094,7 +1115,7 @@ static void declaration(Compiler* compiler) {
 ParseRule rules[] = {
 	[TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
 	[TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
-	[TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
+	[TOKEN_LEFT_BRACE] = {NULL, objectPropertyAssign, PREC_CALL},
 	[TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_LEFT_SQUARE] = {list, subscript, PREC_CALL},
 	[TOKEN_RIGHT_SQUARE] = {NULL, NULL, PREC_NONE},
@@ -1103,6 +1124,7 @@ ParseRule rules[] = {
 	[TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
 	[TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
 	[TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
+	[TOKEN_COLON] = {NULL, NULL, PREC_NONE},
 	[TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
 	[TOKEN_DOT] = {NULL, dot, PREC_CALL},
 	[TOKEN_BANG] = {unary, NULL, PREC_NONE},
@@ -1145,7 +1167,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(48 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(49 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(TokenType type) {
 	return &rules[type];

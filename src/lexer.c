@@ -217,6 +217,7 @@ Token lexToken(Lexer* lexer) {
 		case '*': return makeToken(lexer, TOKEN_STAR);
 		case '/': return makeToken(lexer, TOKEN_SLASH);
 		case ';': return makeToken(lexer, TOKEN_SEMICOLON);
+		case ':': return makeToken(lexer, TOKEN_COLON);
 		case ',': return makeToken(lexer, TOKEN_COMMA);
 		case '.': return makeToken(lexer, TOKEN_DOT);
 		case '!': return match(lexer, '=') ? makeToken(lexer, TOKEN_BANG_EQUAL) : makeToken(lexer, TOKEN_BANG);

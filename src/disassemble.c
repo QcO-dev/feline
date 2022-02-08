@@ -111,6 +111,7 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 		CONSTANT(METHOD)
 		CONSTANT(ACCESS_PROPERTY)
 		CONSTANT(ASSIGN_PROPERTY)
+		CONSTANT(ASSIGN_PROPERTY_KV)
 		CONSTANT(ACCESS_SUPER)
 
 		case OP_INVOKE: {
