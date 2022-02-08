@@ -884,6 +884,22 @@ InterpreterResult executeVM(VM* vm) {
 					pop(vm);
 					push(vm, value);
 				}
+				else if (IS_INSTANCE(indexee)) {
+					ObjInstance* instance = AS_INSTANCE(indexee);
+
+					if (!IS_STRING(index)) {
+						throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_PROPERTY], "Property name must be a string in subscript");
+						break;
+					}
+
+					ObjString* propertyName = AS_STRING(index);
+
+					tableSet(vm, &instance->fields, propertyName, value);
+					pop(vm);
+					pop(vm);
+					pop(vm);
+					push(vm, value);
+				}
 				else {
 					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Invalid subscript target");
 					break;
