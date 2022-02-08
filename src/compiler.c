@@ -507,9 +507,13 @@ static void number(Compiler* compiler, bool canAssign) {
 	emitConstant(compiler, NUMBER_VAL(value));
 }
 
+static ObjString* normString(Compiler* compiler, Token strToken) {
+	return copyString(compiler->vm, strToken.start + 1, strToken.length - 2);
+}
+
 static void string(Compiler* compiler, bool canAssign) {
 	// The +1 and - 2 remove the double quotes from the lexeme
-	ObjString* str = copyString(compiler->vm, compiler->previous.start + 1, compiler->previous.length - 2);
+	ObjString* str = normString(compiler, compiler->previous);
 	emitConstant(compiler, OBJ_VAL(str));
 }
 
@@ -567,16 +571,27 @@ static void objectPropertyAssign(Compiler* compiler, bool canAssign) {
 
 	if (!check(compiler, TOKEN_RIGHT_BRACE)) {
 		do {
-			consume(compiler, TOKEN_IDENTIFIER, "Expected identifier key for key-value pair");
+			uint16_t key;
+			if (match(compiler, TOKEN_STRING)) {
+				ObjString* str = normString(compiler, compiler->previous);
+				key = makeConstant(compiler, OBJ_VAL(str));
 
-			Token keyToken = compiler->previous;
-			uint16_t key = identifierConstant(compiler, &compiler->previous);
+				consume(compiler, TOKEN_COLON, "Expected ':' between key-value pair");
 
-			if (match(compiler, TOKEN_COLON)) {
 				expression(compiler);
 			}
 			else {
-				namedVariable(compiler, keyToken, false);
+				consume(compiler, TOKEN_IDENTIFIER, "Expected identifier key for key-value pair");
+
+				Token keyToken = compiler->previous;
+				key = identifierConstant(compiler, &compiler->previous);
+
+				if (match(compiler, TOKEN_COLON)) {
+					expression(compiler);
+				}
+				else {
+					namedVariable(compiler, keyToken, false);
+				}
 			}
 
 			emitOOInstruction(compiler, OP_ASSIGN_PROPERTY_KV, key);
