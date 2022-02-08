@@ -86,7 +86,7 @@ void initVM(VM* vm) {
 	
 	for (size_t i = 0; i < INTERNAL_STR__COUNT; i++) vm->internalStrings[i] = NULL;
 	for (size_t i = 0; i < INTERNAL_EXCEPTION__COUNT; i++) vm->internalExceptions[i] = NULL;
-	for (size_t i = 0; i < INTERNAL_CLASS__COUNT; i++) vm->internalExceptions[i] = NULL;
+	for (size_t i = 0; i < INTERNAL_CLASS__COUNT; i++) vm->internalClasses[i] = NULL;
 
 	vm->hasException = false;
 	vm->exception = NULL_VAL;
@@ -102,9 +102,9 @@ void initVM(VM* vm) {
 
 	buildInternalStrings(vm);
 
-	defineExceptionClasses(vm);
-
 	defineObjectClass(vm);
+
+	defineExceptionClasses(vm);
 
 	defineNative(vm, "clock", clockNative);
 	defineNative(vm, "len", lenNative);
@@ -800,6 +800,11 @@ InterpreterResult executeVM(VM* vm) {
 					break;
 				}
 				frame = &vm->frames.items[vm->frames.length - 1];
+				break;
+			}
+
+			case OP_OBJECT: {
+				push(vm, OBJ_VAL(vm->internalClasses[INTERNAL_CLASS_OBJECT]));
 				break;
 			}
 

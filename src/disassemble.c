@@ -38,6 +38,15 @@ static size_t byteInstruction(const char* name, VM* vm, Chunk* chunk, size_t off
 	return offset + 2;
 }
 
+static size_t invokeInstruction(const char* name, VM* vm, Chunk* chunk, size_t offset) {
+	uint16_t constant = ((chunk->bytecode.items[offset + 1] << 8) | (chunk->bytecode.items[offset + 2]));
+	uint8_t argCount = chunk->bytecode.items[offset + 3];
+	printf("%-20s (%d args) %4d '", name, argCount, constant);
+	printValue(vm, chunk->constants.items[constant]);
+	printf("'");
+	return offset + 4;
+}
+
 static size_t simpleInstruction(const char* name, VM* vm, Chunk* chunk, size_t offset) {
 	printf("%-20s", name);
 	return offset + 1;
@@ -49,6 +58,7 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 #define SHORT(x) case OP_##x: return shortInstruction(#x, vm, chunk, offset);
 #define JUMP(x, sign) case OP_##x: return jumpInstruction(#x, sign, vm, chunk, offset);
 #define BYTE(x) case OP_##x: return byteInstruction(#x, vm, chunk, offset);
+#define INVOKE(x) case OP_##x: return invokeInstruction(#x, vm, chunk, offset);
 
 	printf("     %04X %4zu ", (int)offset, getLineOfInstruction(chunk, offset));
 
@@ -113,17 +123,9 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 		CONSTANT(ASSIGN_PROPERTY)
 		CONSTANT(ASSIGN_PROPERTY_KV)
 		CONSTANT(ACCESS_SUPER)
-
-		case OP_INVOKE: {
-			uint16_t constant = ((chunk->bytecode.items[offset + 1] << 8) | (chunk->bytecode.items[offset + 2]));
-			uint8_t argCount = chunk->bytecode.items[offset + 3];
-			printf("%-20s (%d args) %4d '", "INVOKE", argCount, constant);
-			printValue(vm, chunk->constants.items[constant]);
-			printf("'");
-			return offset + 4;
-		}
-
-		CONSTANT(SUPER_INVOKE)
+		INVOKE(INVOKE)
+		INVOKE(SUPER_INVOKE)
+		SIMPLE(OBJECT)
 		SIMPLE(CREATE_OBJECT)
 
 		SHORT(LIST)

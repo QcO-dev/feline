@@ -52,6 +52,7 @@ typedef enum Opcode {
 	OP_ACCESS_SUPER,
 	OP_INVOKE,
 	OP_SUPER_INVOKE,
+	OP_OBJECT,
 	OP_CREATE_OBJECT,
 	// Lists
 	OP_LIST,

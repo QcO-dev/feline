@@ -29,7 +29,6 @@ typedef enum FunctionType {
 
 typedef struct ClassCompiler {
 	struct ClassCompiler* enclosing;
-	bool hasSuperclass;
 } ClassCompiler;
 
 typedef struct Compiler {
@@ -543,9 +542,6 @@ static void super_(Compiler* compiler, bool canAssign) {
 	if (compiler->currentClass == NULL) {
 		error(compiler, "Cannot use 'super' outside of a class");
 	}
-	else if (!compiler->currentClass->hasSuperclass) {
-		error(compiler, "Cannot use 'super' in a class without a superclass");
-	}
 
 	consume(compiler, TOKEN_DOT, "Expected '.' after 'super'");
 	consume(compiler, TOKEN_IDENTIFIER, "Expected superclass method name");
@@ -1053,7 +1049,6 @@ static void classDeclaration(Compiler* compiler) {
 	defineVariable(compiler, nameConstant);
 
 	ClassCompiler classCompiler;
-	classCompiler.hasSuperclass = false;
 	classCompiler.enclosing = compiler->currentClass;
 	compiler->currentClass = &classCompiler;
 
@@ -1064,16 +1059,17 @@ static void classDeclaration(Compiler* compiler) {
 		if (identifiersEqual(&className, &compiler->previous)) {
 			error(compiler, "A class cannot inherit from itself");
 		}
-
-		beginScope(compiler);
-		addLocal(compiler, syntheticToken("super"));
-		defineVariable(compiler, 0);
-
-		namedVariable(compiler, className, false);
-		emitByte(compiler, OP_INHERIT);
-
-		classCompiler.hasSuperclass = true;
 	}
+	else {
+		emitByte(compiler, OP_OBJECT);
+	}
+
+	beginScope(compiler);
+	addLocal(compiler, syntheticToken("super"));
+	defineVariable(compiler, 0);
+
+	namedVariable(compiler, className, false);
+	emitByte(compiler, OP_INHERIT);
 
 	namedVariable(compiler, className, false);
 
@@ -1087,9 +1083,7 @@ static void classDeclaration(Compiler* compiler) {
 
 	emitByte(compiler, OP_POP);
 
-	if (classCompiler.hasSuperclass) {
-		endScope(compiler);
-	}
+	endScope(compiler);
 
 	compiler->currentClass = compiler->currentClass->enclosing;
 }
