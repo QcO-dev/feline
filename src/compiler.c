@@ -569,11 +569,15 @@ static void objectPropertyAssign(Compiler* compiler, bool canAssign) {
 		do {
 			consume(compiler, TOKEN_IDENTIFIER, "Expected identifier key for key-value pair");
 
+			Token keyToken = compiler->previous;
 			uint16_t key = identifierConstant(compiler, &compiler->previous);
 
-			consume(compiler, TOKEN_COLON, "Expected ':' between key and value");
-
-			expression(compiler);
+			if (match(compiler, TOKEN_COLON)) {
+				expression(compiler);
+			}
+			else {
+				namedVariable(compiler, keyToken, false);
+			}
 
 			emitOOInstruction(compiler, OP_ASSIGN_PROPERTY_KV, key);
 		} while (match(compiler, TOKEN_COMMA));
