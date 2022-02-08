@@ -816,6 +816,24 @@ InterpreterResult executeVM(VM* vm) {
 				break;
 			}
 
+			case OP_INSTANCEOF: {
+				Value superclass = pop(vm);
+				Value instance = pop(vm);
+
+				if (!IS_INSTANCE(instance)) {
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Left-hand-side of instanceof must be an instance");
+					break;
+				}
+
+				if (!IS_CLASS(superclass)) {
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Right-hand-side of instanceof must be a class");
+					break;
+				}
+
+				push(vm, BOOL_VAL(instanceof(AS_INSTANCE(instance), AS_CLASS(superclass))));
+				break;
+			}
+
 			case OP_LIST: {
 				uint16_t length = READ_SHORT();
 

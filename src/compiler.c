@@ -64,7 +64,7 @@ typedef enum Precedence {
 	PREC_OR,          // ||
 	PREC_AND,         // &&
 	PREC_EQUALITY,    // == !=
-	PREC_COMPARISON,  // < > <= >=
+	PREC_COMPARISON,  // < > <= >= instanceof
 	PREC_TERM,        // + -
 	PREC_FACTOR,      // * /
 	PREC_UNARY,       // ! -
@@ -666,6 +666,7 @@ static void binary(Compiler* compiler, bool canAssign) {
 		case TOKEN_LESS_EQUAL: emitByte(compiler, OP_LESS_EQUAL); break;
 		case TOKEN_GREATER: emitByte(compiler, OP_GREATER); break;
 		case TOKEN_GREATER_EQUAL: emitByte(compiler, OP_GREATER_EQUAL); break;
+		case TOKEN_INSTANCEOF: emitByte(compiler, OP_INSTANCEOF); break;
 		default: {
 			ASSERT(0, "Unreachable");
 			return;
@@ -1171,6 +1172,7 @@ ParseRule rules[] = {
 	[TOKEN_FOR] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FUNCTION] = {NULL, NULL, PREC_NONE},
 	[TOKEN_IF] = {NULL, NULL, PREC_NONE},
+	[TOKEN_INSTANCEOF] = {NULL, binary, PREC_COMPARISON},
 	[TOKEN_NULL] = {literal, NULL, PREC_NONE},
 	[TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
 	[TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
@@ -1186,7 +1188,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(49 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(50 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(TokenType type) {
 	return &rules[type];
