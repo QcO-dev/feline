@@ -153,7 +153,15 @@ static TokenType identifierType(Lexer* lexer) {
 			}
 			break;
 		}
-		case 'i': return checkKeyword(lexer, 1, 1, "f", TOKEN_IF);
+		case 'i': {
+			if (lexer->current - lexer->start > 1) {
+				switch (lexer->start[1]) {
+					case 'f': return checkKeyword(lexer, 2, 0, "", TOKEN_IF);
+					case 'n': return checkKeyword(lexer, 2, 8, "stanceof", TOKEN_INSTANCEOF);
+				}
+			}
+			break;
+		}
 		case 'n': return checkKeyword(lexer, 1, 3, "ull", TOKEN_NULL);
 		case 'p': return checkKeyword(lexer, 1, 4, "rint", TOKEN_PRINT);
 		case 'r': return checkKeyword(lexer, 1, 5, "eturn", TOKEN_RETURN);

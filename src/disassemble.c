@@ -127,6 +127,7 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 		INVOKE(SUPER_INVOKE)
 		SIMPLE(OBJECT)
 		SIMPLE(CREATE_OBJECT)
+		SIMPLE(INSTANCEOF)
 
 		SHORT(LIST)
 		SIMPLE(ACCESS_SUBSCRIPT)
