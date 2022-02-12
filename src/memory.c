@@ -76,6 +76,9 @@ static void markRoots(VM* vm) {
 	}
 
 	markTable(vm, &vm->globals);
+	markTable(vm, &vm->nativeLibraries);
+	markObject(vm, (Obj*)&vm->directory);
+	markObject(vm, (Obj*)&vm->name);
 
 	markCompilerRoots(vm);
 	

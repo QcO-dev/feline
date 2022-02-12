@@ -107,9 +107,8 @@ ObjList* newList(VM* vm, ValueArray items) {
 
 // ========= Native Libraries =========
 
-ObjNativeLibrary* newNativeLibrary(VM* vm, ObjString* path) {
+ObjNativeLibrary* newNativeLibrary(VM* vm, NativeLibrary library) {
 	ObjNativeLibrary* objLibrary = ALLOCATE_OBJ(vm, ObjNativeLibrary, OBJ_NATIVE_LIBRARY);
-	NativeLibrary library = loadNativeLibrary(vm, path);
 	objLibrary->library = library;
 	return objLibrary;
 }

@@ -10,8 +10,10 @@
 #include <Windows.h>
 
 typedef HINSTANCE NativeLibrary;
+
+#define NATIVE_LIBRARY_EXT "dll"
 #endif
 
 NativeLibrary loadNativeLibrary(VM* vm, ObjString* path);
-
 void freeNativeLibrary(NativeLibrary library);
+NativeFunction loadNativeFunction(VM* vm, NativeLibrary library, ObjString* name);

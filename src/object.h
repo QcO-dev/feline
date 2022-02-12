@@ -47,8 +47,6 @@ typedef struct ObjClosure {
 	size_t upvalueCount;
 } ObjClosure;
 
-typedef Value(*NativeFunction)(VM* vm, uint8_t argCount, Value* args);
-
 typedef struct ObjNative {
 	Obj obj;
 	NativeFunction function;
@@ -111,7 +109,7 @@ ObjBoundMethod* newBoundMethod(VM* vm, Value receiver, ObjClosure* method);
 
 ObjList* newList(VM* vm, ValueArray items);
 
-ObjNativeLibrary* newNativeLibrary(VM* vm, ObjString* path);
+ObjNativeLibrary* newNativeLibrary(VM* vm, NativeLibrary library);
 
 ObjString* copyString(VM* vm, const char* str, size_t length);
 ObjString* takeString(VM* vm, char* str, size_t length);
@@ -142,4 +140,4 @@ void printObject(VM* vm, Value value);
 #define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
 #define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
 #define AS_LIST(value) ((ObjList*)AS_OBJ(value))
-#define AS_NATIVE_LIBRARY(value) (((ObjNativeLibrary*)value)->library)
+#define AS_NATIVE_LIBRARY(value) (((ObjNativeLibrary*)AS_OBJ(value))->library)

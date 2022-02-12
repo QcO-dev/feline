@@ -116,6 +116,20 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 
 		BYTE(CALL)
 		SIMPLE(RETURN)
+
+		case OP_NATIVE: {
+			uint16_t index = ((chunk->bytecode.items[offset + 1] << 8) | (chunk->bytecode.items[offset + 2]));
+
+			Value value = chunk->constants.items[index];
+
+			printf("%-20s %4d '", "NATIVE", index);
+			printValue(vm, value);
+			printf("' (%d args)", chunk->bytecode.items[offset + 3]);
+
+
+			return offset + 4;
+		}
+
 		CONSTANT(CLASS)
 		SIMPLE(INHERIT)
 		CONSTANT(METHOD)

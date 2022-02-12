@@ -31,7 +31,6 @@ static Value clockNative(VM* vm, uint8_t argCount, Value* args) {
 	return NUMBER_VAL((double)clock() / 1000);
 }
 
-
 //TODO:
 //  len() is temporary until we can access methods on lists & strings :-)
 static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
@@ -78,6 +77,9 @@ void initVM(VM* vm) {
 
 	vm->openUpvalues = NULL;
 	vm->lowestLevelCompiler = NULL;
+	
+	vm->name = NULL;
+	vm->directory = NULL;
 	
 	for (size_t i = 0; i < INTERNAL_STR__COUNT; i++) vm->internalStrings[i] = NULL;
 	for (size_t i = 0; i < INTERNAL_EXCEPTION__COUNT; i++) vm->internalExceptions[i] = NULL;
@@ -693,6 +695,24 @@ InterpreterResult executeVM(VM* vm) {
 				push(vm, result);
 
 				frame = &vm->frames.items[vm->frames.length - 1];
+				break;
+			}
+
+			case OP_NATIVE: {
+				ObjString* name = READ_STRING();
+				uint8_t arity = READ_BYTE();
+				
+				NativeLibrary library = loadNativeLibrary(vm, makeStringf(vm, "%s%s." NATIVE_LIBRARY_EXT, vm->directory->str, vm->name->str));
+
+				if (library == NULL) break;
+
+				NativeFunction function = loadNativeFunction(vm, library, makeStringf(vm, "feline_%s", name->str));
+
+				if (library == NULL) break;
+
+				ObjNative* native = newNative(vm, function, arity);
+
+				push(vm, OBJ_VAL(native));
 				break;
 			}
 

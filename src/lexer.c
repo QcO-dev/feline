@@ -162,7 +162,15 @@ static FelineTokenType identifierType(Lexer* lexer) {
 			}
 			break;
 		}
-		case 'n': return checkKeyword(lexer, 1, 3, "ull", TOKEN_NULL);
+		case 'n': {
+			if (lexer->current - lexer->start > 1) {
+				switch (lexer->start[1]) {
+					case 'a': return checkKeyword(lexer, 2, 4, "tive", TOKEN_NATIVE);
+					case 'u': return checkKeyword(lexer, 2, 2, "ll", TOKEN_NULL);
+				}
+			}
+			break;
+		}
 		case 'p': return checkKeyword(lexer, 1, 4, "rint", TOKEN_PRINT);
 		case 'r': return checkKeyword(lexer, 1, 5, "eturn", TOKEN_RETURN);
 		case 's': return checkKeyword(lexer, 1, 4, "uper", TOKEN_SUPER);

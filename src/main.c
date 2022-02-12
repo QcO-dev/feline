@@ -1,8 +1,26 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "chunk.h"
+#include "memory.h"
 #include "opcode.h"
 #include "vm.h"
+
+#ifndef _WIN32
+#include <string.h>
+#include <libgen.h>
+
+void strip_ext(char* fname) {
+	char* end = fname + strlen(fname);
+
+	while (end > fname && *end != '.') {
+		--end;
+	}
+
+	if (end > fname) {
+		*end = '\0';
+	}
+}
+#endif
+
 
 static char* readFile(const char* path) {
 	FILE* file = fopen(path, "rb");
@@ -34,10 +52,42 @@ static char* readFile(const char* path) {
 	return charBuffer;
 }
 
+static void splitPathToNameAndDirectory(VM* vm, const char* path) {
+#ifdef _WIN32
+	size_t pathLength = strlen(path);
+	char* dir = reallocate(vm, NULL, 0, _MAX_DIR);
+	char* fname = reallocate(vm, NULL, 0, _MAX_FNAME);
+	char* drive = reallocate(vm, NULL, 0, _MAX_DRIVE);
+
+	_splitpath(path, drive, dir, fname, NULL);
+
+	vm->directory = makeStringf(vm, "%s%s", drive, dir);
+	vm->name = takeString(vm, fname, strlen(fname));
+
+	FREE_ARRAY(vm, char, dir, strlen(dir));
+	FREE_ARRAY(vm, char, drive, strlen(drive));
+#else
+	char* dirPathCopy = strdup(path);
+
+	char* directory = dirname(dirPathCopy);
+	vm->directory = copyString(vm, directory, strlen(directory));
+	
+	free(dirPathCopy);
+
+	char* fnamePathCopy = strdup(path);
+	char* fname = basename(fnamePathCopy);
+	strip_ext(fname);
+	vm->name = copyString(vm, fname, strlen(fname));
+
+	free(fnamePathCopy);
+#endif
+}
+
 static void runFile(const char* path) {
 	char* source = readFile(path);
 	VM vm;
 	initVM(&vm);
+	splitPathToNameAndDirectory(&vm, path);
 	InterpreterResult result = interpret(&vm, source);
 	freeVM(&vm);
 

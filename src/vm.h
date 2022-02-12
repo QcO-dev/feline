@@ -51,6 +51,9 @@ typedef struct VM {
 	Value exception;
 	bool hasException;
 
+	ObjString* name;
+	ObjString* directory;
+
 	ObjString* internalStrings[INTERNAL_STR__COUNT];
 	ObjClass* internalExceptions[INTERNAL_EXCEPTION__COUNT];
 	ObjClass* internalClasses[INTERNAL_CLASS__COUNT];
