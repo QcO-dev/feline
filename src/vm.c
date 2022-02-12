@@ -708,7 +708,7 @@ InterpreterResult executeVM(VM* vm) {
 
 				NativeFunction function = loadNativeFunction(vm, library, makeStringf(vm, "feline_%s", name->str));
 
-				if (library == NULL) break;
+				if (function == NULL) break;
 
 				ObjNative* native = newNative(vm, function, arity);
 
