@@ -4,6 +4,7 @@
 #include "table.h"
 #include "object.h"
 #include "builtin/exception.h"
+#include "ffi/felineffi.h"
 
 typedef struct Compiler Compiler;
 
@@ -81,7 +82,7 @@ void freeVM(VM* vm);
 
 void push(VM* vm, Value value);
 Value pop(VM* vm);
-void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...);
+FELINE_EXPORT void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...);
 
 void inheritClasses(VM* vm, ObjClass* subclass, ObjClass* superclass);
 

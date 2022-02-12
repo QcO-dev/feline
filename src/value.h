@@ -4,6 +4,7 @@
 
 typedef struct VM VM;
 typedef struct Obj Obj;
+
 typedef struct ObjString ObjString;
 
 typedef enum ValueType {
@@ -22,7 +23,7 @@ typedef struct Value {
 	} as;
 } Value;
 
-typedef Value(*NativeFunction)(VM* vm, uint8_t argCount, Value* args);
+typedef Value(*NativeFunction)(VM* vm, uint8_t argCount, Value* value);
 
 #define BOOL_VAL(value) ((Value){VAL_BOOL, { .boolean = value }})
 #define NULL_VAL ((Value){VAL_NULL, { .number = 0 }})
