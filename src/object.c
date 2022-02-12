@@ -211,6 +211,10 @@ void printObject(VM* vm, Value value) {
 			printf("upvalue");
 			break;
 		}
+		case OBJ_NATIVE: {
+			printf("<native function>");
+			break;
+		}
 		case OBJ_FUNCTION: {
 			printFunction(vm, AS_FUNCTION(value));
 			break;
