@@ -42,6 +42,7 @@ typedef enum Opcode {
 	OP_CLOSURE,
 	OP_CALL,
 	OP_RETURN,
+	OP_NATIVE,
 	// Classes & Objects
 	OP_CLASS,
 	OP_INHERIT,

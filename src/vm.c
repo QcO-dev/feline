@@ -19,9 +19,9 @@ DEFINE_DYNAMIC_ARRAY(CallFrame, CallFrame)
 
 Value peek(VM* vm, size_t distance);
 
-static void defineNative(VM* vm, const char* name, NativeFunction function) {
+static void defineNative(VM* vm, const char* name, NativeFunction function, size_t arity) {
 	push(vm, OBJ_VAL(copyString(vm, name, strlen(name))));
-	push(vm, OBJ_VAL(newNative(vm, function)));
+	push(vm, OBJ_VAL(newNative(vm, function, arity)));
 	tableSet(vm, &vm->globals, AS_STRING(peek(vm, 1)), peek(vm, 0));
 	pop(vm);
 	pop(vm);
@@ -31,17 +31,9 @@ static Value clockNative(VM* vm, uint8_t argCount, Value* args) {
 	return NUMBER_VAL((double)clock() / 1000);
 }
 
-
 //TODO:
 //  len() is temporary until we can access methods on lists & strings :-)
 static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
-	//TODO:
-	//  As native methods have no way of knowing what their arguments are,
-	//  We return null on error
-
-	if(argCount == 0)
-		return NULL_VAL;
-
 	if (IS_LIST(args[0])) {
 		return NUMBER_VAL((double)AS_LIST(args[0])->items.length);
 	}
@@ -49,6 +41,7 @@ static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
 		return NUMBER_VAL((double)AS_STRING(args[0])->length);
 	}
 	
+	throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Expected argument to be a list or string");
 	return NULL_VAL;
 }
 
@@ -65,6 +58,7 @@ void buildInternalStrings(VM* vm) {
 	vm->internalStrings[INTERNAL_STR_INDEX_RANGE_EXCEPTION] = copyString(vm, "IndexRangeException", 19);
 	vm->internalStrings[INTERNAL_STR_UNDEFINED_VARIABLE_EXCEPTION] = copyString(vm, "UndefinedVariableException", 26);
 	vm->internalStrings[INTERNAL_STR_STACK_OVERFLOW_EXCEPTION] = copyString(vm, "StackOverflowException", 22);
+	vm->internalStrings[INTERNAL_STR_LINK_FAILURE_EXCEPTION] = copyString(vm, "LinkFailureException", 20);
 
 	vm->internalStrings[INTERNAL_STR_REASON] = copyString(vm, "reason", 6);
 
@@ -84,6 +78,9 @@ void initVM(VM* vm) {
 	vm->openUpvalues = NULL;
 	vm->lowestLevelCompiler = NULL;
 	
+	vm->name = NULL;
+	vm->directory = NULL;
+	
 	for (size_t i = 0; i < INTERNAL_STR__COUNT; i++) vm->internalStrings[i] = NULL;
 	for (size_t i = 0; i < INTERNAL_EXCEPTION__COUNT; i++) vm->internalExceptions[i] = NULL;
 	for (size_t i = 0; i < INTERNAL_CLASS__COUNT; i++) vm->internalClasses[i] = NULL;
@@ -94,6 +91,7 @@ void initVM(VM* vm) {
 	initCallFrameArray(&vm->frames);
 	initTable(&vm->strings);
 	initTable(&vm->globals);
+	initTable(&vm->nativeLibraries);
 
 	// Forces the stack to resize before anything else is allocated
 	// Allows for push() and pop() to be used to stop values being GC'd.
@@ -106,13 +104,14 @@ void initVM(VM* vm) {
 
 	defineExceptionClasses(vm);
 
-	defineNative(vm, "clock", clockNative);
-	defineNative(vm, "len", lenNative);
+	defineNative(vm, "clock", clockNative, 0);
+	defineNative(vm, "len", lenNative, 1);
 }
 
 void freeVM(VM* vm) {
 	freeTable(vm, &vm->strings);
 	freeTable(vm, &vm->globals);
+	freeTable(vm, &vm->nativeLibraries);
 	freeValueArray(vm, &vm->stack);
 	freeCallFrameArray(vm, &vm->frames);
 	freeObjects(vm);
@@ -151,7 +150,7 @@ static void resetStack(VM* vm) {
 	vm->openUpvalues = NULL;
 }
 
-static void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...) {
+void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...) {
 	va_list args;
 	va_start(args, format);
 	ObjString* reason = makeStringvf(vm, format, args);
@@ -247,7 +246,13 @@ static bool callValue(VM* vm, Value callee, uint8_t argCount) {
 				return callClosure(vm, AS_CLOSURE(callee), argCount);
 			}
 			case OBJ_NATIVE: {
+				ObjNative* nativeObj = AS_NATIVE_OBJ(callee);
 				NativeFunction native = AS_NATIVE(callee);
+
+				if (argCount != nativeObj->arity) {
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_ARITY], "Expected %d arguments but got %d", nativeObj->arity, argCount);
+					return false;
+				}
 
 				Value result = native(vm, argCount, &vm->stack.items[vm->stack.length - argCount]);
 				vm->stack.length -= (size_t)argCount + 1;
@@ -402,6 +407,14 @@ InterpreterResult executeVM(VM* vm) {
 			push(vm, OBJ_VAL(stackTrace));
 			while (vm->hasException) {
 
+				ObjFunction* function = frame->closure->function;
+				size_t instruction = frame->ip - function->chunk.bytecode.items - 1;
+
+				ObjString* tracer = makeStringf(vm, "[%zu] in %s", getLineOfInstruction(&function->chunk, instruction), function->name != NULL ? function->name->str : "<script>");
+				push(vm, OBJ_VAL(tracer));
+				writeValueArray(vm, &stackTrace->items, peek(vm, 0));
+				pop(vm);
+
 				if (frame->isTryBlock) {
 					frame->ip = frame->catchLocation;
 					frame->isTryBlock = false;
@@ -417,14 +430,6 @@ InterpreterResult executeVM(VM* vm) {
 					vm->stack.length = frame->tryStackOffset;
 					break;
 				}
-
-				ObjFunction* function = frame->closure->function;
-				size_t instruction = frame->ip - function->chunk.bytecode.items - 1;
-
-				ObjString* tracer = makeStringf(vm, "[%zu] in %s", getLineOfInstruction(&function->chunk, instruction), function->name != NULL ? function->name->str : "<script>");
-				push(vm, OBJ_VAL(tracer));
-				writeValueArray(vm, &stackTrace->items, peek(vm, 0));
-				pop(vm);
 
 				closeUpvalues(vm, &vm->stack.items[frame->slotsOffset]);
 
@@ -690,6 +695,24 @@ InterpreterResult executeVM(VM* vm) {
 				push(vm, result);
 
 				frame = &vm->frames.items[vm->frames.length - 1];
+				break;
+			}
+
+			case OP_NATIVE: {
+				ObjString* name = READ_STRING();
+				uint8_t arity = READ_BYTE();
+				
+				NativeLibrary library = loadNativeLibrary(vm, makeStringf(vm, "%s%s." NATIVE_LIBRARY_EXT, vm->directory->str, vm->name->str));
+
+				if (library == NULL) break;
+
+				NativeFunction function = loadNativeFunction(vm, library, makeStringf(vm, "feline_%s", name->str));
+
+				if (library == NULL) break;
+
+				ObjNative* native = newNative(vm, function, arity);
+
+				push(vm, OBJ_VAL(native));
 				break;
 			}
 

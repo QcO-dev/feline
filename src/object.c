@@ -62,9 +62,10 @@ ObjUpvalue* newUpvalue(VM* vm, Value* slot) {
 
 // ========= Native Functions =========
 
-ObjNative* newNative(VM* vm, NativeFunction function) {
+ObjNative* newNative(VM* vm, NativeFunction function, size_t arity) {
 	ObjNative* native = ALLOCATE_OBJ(vm, ObjNative, OBJ_NATIVE);
 	native->function = function;
+	native->arity = arity;
 	return native;
 }
 
@@ -102,6 +103,14 @@ ObjList* newList(VM* vm, ValueArray items) {
 	ObjList* list = ALLOCATE_OBJ(vm, ObjList, OBJ_LIST);
 	list->items = items;
 	return list;
+}
+
+// ========= Native Libraries =========
+
+ObjNativeLibrary* newNativeLibrary(VM* vm, NativeLibrary library) {
+	ObjNativeLibrary* objLibrary = ALLOCATE_OBJ(vm, ObjNativeLibrary, OBJ_NATIVE_LIBRARY);
+	objLibrary->library = library;
+	return objLibrary;
 }
 
 // ========= Strings =========
@@ -209,6 +218,15 @@ void printObject(VM* vm, Value value) {
 		case OBJ_UPVALUE: {
 			// Should be unreachable, but some output is useful just in case
 			printf("upvalue");
+			break;
+		}
+		case OBJ_NATIVE_LIBRARY: {
+			// Should be unreachable, but some output is useful just in case
+			printf("<native library>");
+			break;
+		}
+		case OBJ_NATIVE: {
+			printf("<native function>");
 			break;
 		}
 		case OBJ_FUNCTION: {

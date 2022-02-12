@@ -176,7 +176,7 @@ static void advance(Compiler* compiler) {
 	}
 }
 
-static void consume(Compiler* compiler, TokenType type, const char* message) {
+static void consume(Compiler* compiler, FelineTokenType type, const char* message) {
 	if (compiler->current.type == type) {
 		advance(compiler);
 		return;
@@ -185,11 +185,11 @@ static void consume(Compiler* compiler, TokenType type, const char* message) {
 	errorAtCurrent(compiler, message);
 }
 
-static bool check(Compiler* compiler, TokenType type) {
+static bool check(Compiler* compiler, FelineTokenType type) {
 	return compiler->current.type == type;
 }
 
-static bool match(Compiler* compiler, TokenType type) {
+static bool match(Compiler* compiler, FelineTokenType type) {
 	if (!check(compiler, type)) return false;
 	advance(compiler);
 	return true;
@@ -497,7 +497,7 @@ static uint8_t argumentList(Compiler* compiler) {
 
 // ========= Compilation =========
 
-static ParseRule* getRule(TokenType type);
+static ParseRule* getRule(FelineTokenType type);
 
 // ==== Single-token values -> literals ====
 
@@ -635,7 +635,7 @@ static void dot(Compiler* compiler, bool canAssign) {
 }
 
 static void unary(Compiler* compiler, bool canAssign) {
-	TokenType opType = compiler->previous.type;
+	FelineTokenType opType = compiler->previous.type;
 
 	parsePrecedence(compiler, PREC_UNARY);
 
@@ -650,7 +650,7 @@ static void unary(Compiler* compiler, bool canAssign) {
 }
 
 static void binary(Compiler* compiler, bool canAssign) {
-	TokenType opType = compiler->previous.type;
+	FelineTokenType opType = compiler->previous.type;
 	ParseRule* rule = getRule(opType);
 
 	parsePrecedence(compiler, (Precedence)(rule->precedence + 1));
@@ -1099,6 +1099,31 @@ static void functionDeclaration(Compiler* compiler) {
 	defineVariable(compiler, global);
 }
 
+static void nativeDeclaration(Compiler* compiler) {
+	uint16_t name = parseVariable(compiler, "Expected native function name");
+
+	consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after function name");
+
+	uint16_t arity = 0;
+	if (!check(compiler, TOKEN_RIGHT_PAREN)) {
+		do {
+			arity++;
+			if (arity > UINT8_MAX) {
+				errorAtCurrent(compiler, "Function cannot have more than 255 parameters");
+			}
+			consume(compiler, TOKEN_IDENTIFIER, "Expected parameter name");
+		} while (match(compiler, TOKEN_COMMA));
+	}
+	consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after parameters");
+
+	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after native function definition");
+
+	emitOOInstruction(compiler, OP_NATIVE, name);
+	emitByte(compiler, (uint8_t)arity);
+
+	defineVariable(compiler, name);
+}
+
 static void varDeclaration(Compiler* compiler) {
 	uint16_t global = parseVariable(compiler, "Expected variable name");
 
@@ -1119,6 +1144,9 @@ static void declaration(Compiler* compiler) {
 	}
 	else if (match(compiler, TOKEN_FUNCTION)) {
 		functionDeclaration(compiler);
+	}
+	else if (match(compiler, TOKEN_NATIVE)) {
+		nativeDeclaration(compiler);
 	}
 	else if (match(compiler, TOKEN_VAR)) {
 		varDeclaration(compiler);
@@ -1173,6 +1201,7 @@ ParseRule rules[] = {
 	[TOKEN_FUNCTION] = {NULL, NULL, PREC_NONE},
 	[TOKEN_IF] = {NULL, NULL, PREC_NONE},
 	[TOKEN_INSTANCEOF] = {NULL, binary, PREC_COMPARISON},
+	[TOKEN_NATIVE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_NULL] = {literal, NULL, PREC_NONE},
 	[TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
 	[TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
@@ -1188,9 +1217,9 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(50 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(51 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
-static ParseRule* getRule(TokenType type) {
+static ParseRule* getRule(FelineTokenType type) {
 	return &rules[type];
 }
 
