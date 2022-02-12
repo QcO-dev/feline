@@ -176,7 +176,7 @@ static void advance(Compiler* compiler) {
 	}
 }
 
-static void consume(Compiler* compiler, TokenType type, const char* message) {
+static void consume(Compiler* compiler, FelineTokenType type, const char* message) {
 	if (compiler->current.type == type) {
 		advance(compiler);
 		return;
@@ -185,11 +185,11 @@ static void consume(Compiler* compiler, TokenType type, const char* message) {
 	errorAtCurrent(compiler, message);
 }
 
-static bool check(Compiler* compiler, TokenType type) {
+static bool check(Compiler* compiler, FelineTokenType type) {
 	return compiler->current.type == type;
 }
 
-static bool match(Compiler* compiler, TokenType type) {
+static bool match(Compiler* compiler, FelineTokenType type) {
 	if (!check(compiler, type)) return false;
 	advance(compiler);
 	return true;
@@ -497,7 +497,7 @@ static uint8_t argumentList(Compiler* compiler) {
 
 // ========= Compilation =========
 
-static ParseRule* getRule(TokenType type);
+static ParseRule* getRule(FelineTokenType type);
 
 // ==== Single-token values -> literals ====
 
@@ -635,7 +635,7 @@ static void dot(Compiler* compiler, bool canAssign) {
 }
 
 static void unary(Compiler* compiler, bool canAssign) {
-	TokenType opType = compiler->previous.type;
+	FelineTokenType opType = compiler->previous.type;
 
 	parsePrecedence(compiler, PREC_UNARY);
 
@@ -650,7 +650,7 @@ static void unary(Compiler* compiler, bool canAssign) {
 }
 
 static void binary(Compiler* compiler, bool canAssign) {
-	TokenType opType = compiler->previous.type;
+	FelineTokenType opType = compiler->previous.type;
 	ParseRule* rule = getRule(opType);
 
 	parsePrecedence(compiler, (Precedence)(rule->precedence + 1));
@@ -1190,7 +1190,7 @@ ParseRule rules[] = {
 
 static_assert(50 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
-static ParseRule* getRule(TokenType type) {
+static ParseRule* getRule(FelineTokenType type) {
 	return &rules[type];
 }
 

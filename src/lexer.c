@@ -37,7 +37,7 @@ static bool match(Lexer* lexer, char expected) {
 	return true;
 }
 
-static Token makeToken(Lexer* lexer, TokenType type) {
+static Token makeToken(Lexer* lexer, FelineTokenType type) {
 	Token token;
 	token.type = type;
 	token.start = lexer->start;
@@ -65,7 +65,7 @@ static bool isAlpha(char c) {
 		c == '_';
 }
 
-static TokenType checkKeyword(Lexer* lexer, size_t start, size_t length, const char* rest, TokenType type) {
+static FelineTokenType checkKeyword(Lexer* lexer, size_t start, size_t length, const char* rest, FelineTokenType type) {
 	if (lexer->current - lexer->start == start + length && memcmp(lexer->start + start, rest, length) == 0) {
 		return type;
 	}
@@ -130,7 +130,7 @@ static Token number(Lexer* lexer) {
 	return makeToken(lexer, TOKEN_NUMBER);
 }
 
-static TokenType identifierType(Lexer* lexer) {
+static FelineTokenType identifierType(Lexer* lexer) {
 	switch (lexer->start[0]) {
 		case 'c': {
 			if (lexer->current - lexer->start > 1) {

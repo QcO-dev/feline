@@ -4,6 +4,7 @@
 #include "value.h"
 #include "chunk.h"
 #include "table.h"
+#include "ffi/ffi.h"
 
 typedef enum ObjType {
 	OBJ_STRING,
@@ -15,6 +16,7 @@ typedef enum ObjType {
 	OBJ_INSTANCE,
 	OBJ_BOUND_METHOD,
 	OBJ_LIST,
+	OBJ_NATIVE_LIBRARY
 } ObjType;
 
 struct Obj {
@@ -77,6 +79,11 @@ typedef struct ObjList {
 	ValueArray items;
 } ObjList;
 
+typedef struct ObjNativeLibrary {
+	Obj obj;
+	NativeLibrary library;
+} ObjNativeLibrary;
+
 struct ObjString {
 	Obj obj;
 	size_t length;
@@ -104,6 +111,8 @@ ObjBoundMethod* newBoundMethod(VM* vm, Value receiver, ObjClosure* method);
 
 ObjList* newList(VM* vm, ValueArray items);
 
+ObjNativeLibrary* newNativeLibrary(VM* vm, ObjString* path);
+
 ObjString* copyString(VM* vm, const char* str, size_t length);
 ObjString* takeString(VM* vm, char* str, size_t length);
 ObjString* makeStringf(VM* vm, const char* format, ...);
@@ -121,6 +130,7 @@ void printObject(VM* vm, Value value);
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
 #define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
 #define IS_LIST(value) isObjType(value, OBJ_LIST)
+#define IS_NATIVE_LIBRARY(value) isObjType(value, OBJ_NATIVE_LIBRARY)
 
 #define AS_STRING(value) ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->str)
@@ -132,3 +142,4 @@ void printObject(VM* vm, Value value);
 #define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
 #define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
 #define AS_LIST(value) ((ObjList*)AS_OBJ(value))
+#define AS_NATIVE_LIBRARY(value) (((ObjNativeLibrary*)value)->library)

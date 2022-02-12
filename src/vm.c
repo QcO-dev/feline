@@ -19,8 +19,6 @@ DEFINE_DYNAMIC_ARRAY(CallFrame, CallFrame)
 
 Value peek(VM* vm, size_t distance);
 
-static void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...);
-
 static void defineNative(VM* vm, const char* name, NativeFunction function, size_t arity) {
 	push(vm, OBJ_VAL(copyString(vm, name, strlen(name))));
 	push(vm, OBJ_VAL(newNative(vm, function, arity)));
@@ -61,6 +59,7 @@ void buildInternalStrings(VM* vm) {
 	vm->internalStrings[INTERNAL_STR_INDEX_RANGE_EXCEPTION] = copyString(vm, "IndexRangeException", 19);
 	vm->internalStrings[INTERNAL_STR_UNDEFINED_VARIABLE_EXCEPTION] = copyString(vm, "UndefinedVariableException", 26);
 	vm->internalStrings[INTERNAL_STR_STACK_OVERFLOW_EXCEPTION] = copyString(vm, "StackOverflowException", 22);
+	vm->internalStrings[INTERNAL_STR_LINK_FAILURE_EXCEPTION] = copyString(vm, "LinkFailureException", 20);
 
 	vm->internalStrings[INTERNAL_STR_REASON] = copyString(vm, "reason", 6);
 
@@ -90,6 +89,7 @@ void initVM(VM* vm) {
 	initCallFrameArray(&vm->frames);
 	initTable(&vm->strings);
 	initTable(&vm->globals);
+	initTable(&vm->nativeLibraries);
 
 	// Forces the stack to resize before anything else is allocated
 	// Allows for push() and pop() to be used to stop values being GC'd.
@@ -109,6 +109,7 @@ void initVM(VM* vm) {
 void freeVM(VM* vm) {
 	freeTable(vm, &vm->strings);
 	freeTable(vm, &vm->globals);
+	freeTable(vm, &vm->nativeLibraries);
 	freeValueArray(vm, &vm->stack);
 	freeCallFrameArray(vm, &vm->frames);
 	freeObjects(vm);
@@ -147,7 +148,7 @@ static void resetStack(VM* vm) {
 	vm->openUpvalues = NULL;
 }
 
-static void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...) {
+void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...) {
 	va_list args;
 	va_start(args, format);
 	ObjString* reason = makeStringvf(vm, format, args);

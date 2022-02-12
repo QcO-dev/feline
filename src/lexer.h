@@ -7,7 +7,7 @@ typedef struct Lexer {
 	size_t line;
 } Lexer;
 
-typedef enum TokenType {
+typedef enum FelineTokenType {
 	TOKEN_LEFT_PAREN, TOKEN_RIGHT_PAREN,
 	TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE,
 	TOKEN_LEFT_SQUARE, TOKEN_RIGHT_SQUARE,
@@ -50,10 +50,10 @@ typedef enum TokenType {
 
 	TOKEN_ERROR, TOKEN_EOF,
 	TOKEN__COUNT
-} TokenType;
+} FelineTokenType;
 
 typedef struct Token {
-	TokenType type;
+	FelineTokenType type;
 	const char* start;
 	size_t length;
 	size_t line;

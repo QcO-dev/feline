@@ -29,6 +29,7 @@ typedef enum InternalString {
 	INTERNAL_STR_INDEX_RANGE_EXCEPTION,
 	INTERNAL_STR_UNDEFINED_VARIABLE_EXCEPTION,
 	INTERNAL_STR_STACK_OVERFLOW_EXCEPTION,
+	INTERNAL_STR_LINK_FAILURE_EXCEPTION,
 	INTERNAL_STR_REASON,
 	INTERNAL_STR_OBJECT,
 	INTERNAL_STR__COUNT
@@ -45,6 +46,7 @@ typedef struct VM {
 
 	Table globals;
 	Table strings;
+	Table nativeLibraries;
 
 	Value exception;
 	bool hasException;
@@ -76,6 +78,7 @@ void freeVM(VM* vm);
 
 void push(VM* vm, Value value);
 Value pop(VM* vm);
+void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...);
 
 void inheritClasses(VM* vm, ObjClass* subclass, ObjClass* superclass);
 

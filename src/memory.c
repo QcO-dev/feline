@@ -1,6 +1,7 @@
 #include "memory.h"
 #include "object.h"
 #include "compiler.h"
+#include "ffi/ffi.h"
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -150,6 +151,7 @@ static void blackenObject(VM* vm, Obj* object) {
 			break;
 		}
 		case OBJ_NATIVE:
+		case OBJ_NATIVE_LIBRARY:
 		case OBJ_STRING: {
 			break;
 		}
@@ -258,6 +260,12 @@ static void freeObject(VM* vm, Obj* object) {
 			ObjList* list = (ObjList*)object;
 			freeValueArray(vm, &list->items);
 			FREE(vm, ObjList, object);
+			break;
+		}
+		case OBJ_NATIVE_LIBRARY: {
+			ObjNativeLibrary* library = (ObjNativeLibrary*)object;
+			freeNativeLibrary(library->library);
+			FREE(vm, ObjNativeLibrary, object);
 			break;
 		}
 	}

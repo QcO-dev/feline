@@ -105,6 +105,15 @@ ObjList* newList(VM* vm, ValueArray items) {
 	return list;
 }
 
+// ========= Native Libraries =========
+
+ObjNativeLibrary* newNativeLibrary(VM* vm, ObjString* path) {
+	ObjNativeLibrary* objLibrary = ALLOCATE_OBJ(vm, ObjNativeLibrary, OBJ_NATIVE_LIBRARY);
+	NativeLibrary library = loadNativeLibrary(vm, path);
+	objLibrary->library = library;
+	return objLibrary;
+}
+
 // ========= Strings =========
 
 static ObjString* allocateString(VM* vm, char* str, size_t length, uint32_t hash) {
@@ -210,6 +219,11 @@ void printObject(VM* vm, Value value) {
 		case OBJ_UPVALUE: {
 			// Should be unreachable, but some output is useful just in case
 			printf("upvalue");
+			break;
+		}
+		case OBJ_NATIVE_LIBRARY: {
+			// Should be unreachable, but some output is useful just in case
+			printf("<native library>");
 			break;
 		}
 		case OBJ_NATIVE: {
