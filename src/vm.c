@@ -21,9 +21,9 @@ Value peek(VM* vm, size_t distance);
 
 static void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...);
 
-static void defineNative(VM* vm, const char* name, NativeFunction function) {
+static void defineNative(VM* vm, const char* name, NativeFunction function, size_t arity) {
 	push(vm, OBJ_VAL(copyString(vm, name, strlen(name))));
-	push(vm, OBJ_VAL(newNative(vm, function)));
+	push(vm, OBJ_VAL(newNative(vm, function, arity)));
 	tableSet(vm, &vm->globals, AS_STRING(peek(vm, 1)), peek(vm, 0));
 	pop(vm);
 	pop(vm);
@@ -37,15 +37,6 @@ static Value clockNative(VM* vm, uint8_t argCount, Value* args) {
 //TODO:
 //  len() is temporary until we can access methods on lists & strings :-)
 static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
-	//TODO:
-	//  As native methods have no way of knowing what their arguments are,
-	//  We return null on error
-
-	if (argCount != 1) {
-		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_ARITY], "Expected 1 argument but got %d", argCount);
-		return NULL_VAL;
-	}
-
 	if (IS_LIST(args[0])) {
 		return NUMBER_VAL((double)AS_LIST(args[0])->items.length);
 	}
@@ -111,8 +102,8 @@ void initVM(VM* vm) {
 
 	defineExceptionClasses(vm);
 
-	defineNative(vm, "clock", clockNative);
-	defineNative(vm, "len", lenNative);
+	defineNative(vm, "clock", clockNative, 0);
+	defineNative(vm, "len", lenNative, 1);
 }
 
 void freeVM(VM* vm) {
@@ -252,7 +243,13 @@ static bool callValue(VM* vm, Value callee, uint8_t argCount) {
 				return callClosure(vm, AS_CLOSURE(callee), argCount);
 			}
 			case OBJ_NATIVE: {
+				ObjNative* nativeObj = AS_NATIVE_OBJ(callee);
 				NativeFunction native = AS_NATIVE(callee);
+
+				if (argCount != nativeObj->arity) {
+					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_ARITY], "Expected %d arguments but got %d", nativeObj->arity, argCount);
+					return false;
+				}
 
 				Value result = native(vm, argCount, &vm->stack.items[vm->stack.length - argCount]);
 				vm->stack.length -= (size_t)argCount + 1;

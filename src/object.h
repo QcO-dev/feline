@@ -50,6 +50,7 @@ typedef Value(*NativeFunction)(VM* vm, uint8_t argCount, Value* args);
 typedef struct ObjNative {
 	Obj obj;
 	NativeFunction function;
+	size_t arity;
 } ObjNative;
 
 typedef struct ObjClass {
@@ -93,7 +94,7 @@ ObjClosure* newClosure(VM* vm, ObjFunction* function);
 
 ObjUpvalue* newUpvalue(VM* vm, Value* slot);
 
-ObjNative* newNative(VM* vm, NativeFunction function);
+ObjNative* newNative(VM* vm, NativeFunction function, size_t arity);
 
 ObjClass* newClass(VM* vm, ObjString* name);
 

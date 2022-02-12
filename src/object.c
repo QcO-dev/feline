@@ -62,9 +62,10 @@ ObjUpvalue* newUpvalue(VM* vm, Value* slot) {
 
 // ========= Native Functions =========
 
-ObjNative* newNative(VM* vm, NativeFunction function) {
+ObjNative* newNative(VM* vm, NativeFunction function, size_t arity) {
 	ObjNative* native = ALLOCATE_OBJ(vm, ObjNative, OBJ_NATIVE);
 	native->function = function;
+	native->arity = arity;
 	return native;
 }
 
