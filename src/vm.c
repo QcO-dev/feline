@@ -19,6 +19,8 @@ DEFINE_DYNAMIC_ARRAY(CallFrame, CallFrame)
 
 Value peek(VM* vm, size_t distance);
 
+static void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...);
+
 static void defineNative(VM* vm, const char* name, NativeFunction function) {
 	push(vm, OBJ_VAL(copyString(vm, name, strlen(name))));
 	push(vm, OBJ_VAL(newNative(vm, function)));
@@ -39,8 +41,10 @@ static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
 	//  As native methods have no way of knowing what their arguments are,
 	//  We return null on error
 
-	if(argCount == 0)
+	if (argCount != 1) {
+		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_ARITY], "Expected 1 argument but got %d", argCount);
 		return NULL_VAL;
+	}
 
 	if (IS_LIST(args[0])) {
 		return NUMBER_VAL((double)AS_LIST(args[0])->items.length);
@@ -49,6 +53,7 @@ static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
 		return NUMBER_VAL((double)AS_STRING(args[0])->length);
 	}
 	
+	throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Expected argument to be a list or string");
 	return NULL_VAL;
 }
 
@@ -402,6 +407,14 @@ InterpreterResult executeVM(VM* vm) {
 			push(vm, OBJ_VAL(stackTrace));
 			while (vm->hasException) {
 
+				ObjFunction* function = frame->closure->function;
+				size_t instruction = frame->ip - function->chunk.bytecode.items - 1;
+
+				ObjString* tracer = makeStringf(vm, "[%zu] in %s", getLineOfInstruction(&function->chunk, instruction), function->name != NULL ? function->name->str : "<script>");
+				push(vm, OBJ_VAL(tracer));
+				writeValueArray(vm, &stackTrace->items, peek(vm, 0));
+				pop(vm);
+
 				if (frame->isTryBlock) {
 					frame->ip = frame->catchLocation;
 					frame->isTryBlock = false;
@@ -417,14 +430,6 @@ InterpreterResult executeVM(VM* vm) {
 					vm->stack.length = frame->tryStackOffset;
 					break;
 				}
-
-				ObjFunction* function = frame->closure->function;
-				size_t instruction = frame->ip - function->chunk.bytecode.items - 1;
-
-				ObjString* tracer = makeStringf(vm, "[%zu] in %s", getLineOfInstruction(&function->chunk, instruction), function->name != NULL ? function->name->str : "<script>");
-				push(vm, OBJ_VAL(tracer));
-				writeValueArray(vm, &stackTrace->items, peek(vm, 0));
-				pop(vm);
 
 				closeUpvalues(vm, &vm->stack.items[frame->slotsOffset]);
 
