@@ -876,6 +876,25 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				break;
 			}
 
+			case OP_CLASS_NATIVE: {
+				ObjClass* clazz = AS_CLASS(peek(vm, 0));
+				ObjString* name = READ_STRING();
+				uint8_t arity = READ_BYTE();
+
+				NativeLibrary library = loadNativeLibrary(vm, makeStringf(vm, "%s%s." NATIVE_LIBRARY_EXT, currentModule->directory->str, currentModule->name->str));
+
+				if (library == NULL) break;
+
+				NativeFunction function = loadNativeFunction(vm, library, makeStringf(vm, "feline_%s_%s", clazz->name->str, name->str));
+
+				if (function == NULL) break;
+
+				ObjNative* native = newNative(vm, function, arity);
+
+				push(vm, OBJ_VAL(native));
+				break;
+			}
+
 			case OP_LIST: {
 				uint16_t length = READ_SHORT();
 

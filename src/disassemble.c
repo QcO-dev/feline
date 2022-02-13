@@ -47,6 +47,19 @@ static size_t invokeInstruction(const char* name, VM* vm, Chunk* chunk, size_t o
 	return offset + 4;
 }
 
+static size_t nativeInstruction(const char* name, VM* vm, Chunk* chunk, size_t offset) {
+	uint16_t index = ((chunk->bytecode.items[offset + 1] << 8) | (chunk->bytecode.items[offset + 2]));
+
+	Value value = chunk->constants.items[index];
+
+	printf("%-20s %4d '", name, index);
+	printValue(vm, value);
+	printf("' (%d args)", chunk->bytecode.items[offset + 3]);
+
+
+	return offset + 4;
+}
+
 static size_t simpleInstruction(const char* name, VM* vm, Chunk* chunk, size_t offset) {
 	printf("%-20s", name);
 	return offset + 1;
@@ -59,6 +72,7 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 #define JUMP(x, sign) case OP_##x: return jumpInstruction(#x, sign, vm, chunk, offset);
 #define BYTE(x) case OP_##x: return byteInstruction(#x, vm, chunk, offset);
 #define INVOKE(x) case OP_##x: return invokeInstruction(#x, vm, chunk, offset);
+#define NATIVE(x) case OP_##x: return nativeInstruction(#x, vm, chunk, offset);
 
 	printf("     %04X %4zu ", (int)offset, getLineOfInstruction(chunk, offset));
 
@@ -117,18 +131,7 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 		BYTE(CALL)
 		SIMPLE(RETURN)
 
-		case OP_NATIVE: {
-			uint16_t index = ((chunk->bytecode.items[offset + 1] << 8) | (chunk->bytecode.items[offset + 2]));
-
-			Value value = chunk->constants.items[index];
-
-			printf("%-20s %4d '", "NATIVE", index);
-			printValue(vm, value);
-			printf("' (%d args)", chunk->bytecode.items[offset + 3]);
-
-
-			return offset + 4;
-		}
+		NATIVE(NATIVE)
 
 		CONSTANT(CLASS)
 		SIMPLE(INHERIT)
@@ -142,6 +145,7 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 		SIMPLE(OBJECT)
 		SIMPLE(CREATE_OBJECT)
 		SIMPLE(INSTANCEOF)
+		NATIVE(CLASS_NATIVE)
 
 		SHORT(LIST)
 		SIMPLE(ACCESS_SUBSCRIPT)
@@ -165,6 +169,9 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 #undef CONSTANT
 #undef SHORT
 #undef JUMP
+#undef BYTE
+#undef INVOKE
+#undef NATIVE
 }
 
 void disassemble(VM* vm, Chunk* chunk, const char* name) {

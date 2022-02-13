@@ -22,6 +22,7 @@
 typedef struct VM VM;
 typedef struct Obj Obj;
 typedef struct ObjClass ObjClass;
+typedef struct ObjInstance ObjInstance;
 
 typedef enum ValueType {
 	VAL_BOOL,
@@ -69,6 +70,10 @@ typedef Value(*NativeFunction)(VM* vm, uint8_t argCount, Value* value);
 
 ObjClass* (*feline_getInternalException)(VM* vm, InternalExceptionType type);
 void (*feline_throwException)(VM* vm, ObjClass* exceptionType, const char* format, ...);
+bool (*feline_isInstance)(Value value);
+ObjInstance* (*feline_asInstance)(Value value);
+bool (*feline_getInstanceField)(VM* vm, ObjInstance* instance, const char* name, Value* value);
+bool (*feline_setInstanceField)(VM* vm, ObjInstance* instance, const char* name, Value value);
 
 #ifdef _WIN32
 HINSTANCE hostFelineApp;
@@ -80,8 +85,12 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
 	if (fdwReason == DLL_PROCESS_ATTACH) {
 		hostFelineApp = GetModuleHandle(NULL);
 
-		feline_getInternalException = (ObjClass* (*)(VM*, InternalExceptionType))GetProcAddress(hostFelineApp, "export_getInternalException");
+		feline_getInternalException = (ObjClass * (*)(VM*, InternalExceptionType))GetProcAddress(hostFelineApp, "export_getInternalException");
 		feline_throwException = (void (*)(VM*, ObjClass*, const char*, ...))GetProcAddress(hostFelineApp, "throwException");
+		feline_isInstance = (bool (*)(Value))GetProcAddress(hostFelineApp, "export_isInstance");
+		feline_asInstance = (ObjInstance * (*)(Value))GetProcAddress(hostFelineApp, "export_asInstance");
+		feline_getInstanceField = (bool (*)(VM*, ObjInstance*, const char*, Value*))GetProcAddress(hostFelineApp, "export_getInstanceField");
+		feline_setInstanceField = (bool (*)(VM*, ObjInstance*, const char*, Value))GetProcAddress(hostFelineApp, "export_setInstanceField");
 	}
 	return TRUE;
 }
