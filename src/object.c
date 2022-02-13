@@ -36,7 +36,7 @@ ObjFunction* newFunction(VM* vm) {
 
 // ========= Closures =========
 
-ObjClosure* newClosure(VM* vm, ObjFunction* function) {
+ObjClosure* newClosure(VM* vm, Module* mod, ObjFunction* function) {
 	ObjUpvalue** upvalues = ALLOCATE(vm, ObjUpvalue*, function->upvalueCount);
 
 	for (size_t i = 0; i < function->upvalueCount; i++) {
@@ -45,6 +45,7 @@ ObjClosure* newClosure(VM* vm, ObjFunction* function) {
 
 	ObjClosure* closure = ALLOCATE_OBJ(vm, ObjClosure, OBJ_CLOSURE);
 	closure->function = function;
+	closure->owner = mod;
 	closure->upvalues = upvalues;
 	closure->upvalueCount = function->upvalueCount;
 	return closure;

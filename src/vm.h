@@ -3,6 +3,7 @@
 #include "chunk.h"
 #include "table.h"
 #include "object.h"
+#include "module.h"
 #include "builtin/exception.h"
 #include "ffi/felineffi.h"
 
@@ -33,11 +34,14 @@ typedef enum InternalString {
 	INTERNAL_STR_LINK_FAILURE_EXCEPTION,
 	INTERNAL_STR_REASON,
 	INTERNAL_STR_OBJECT,
+	INTERNAL_STR_IMPORT,
+	INTERNAL_STR_THIS_MODULE,
 	INTERNAL_STR__COUNT
 } InternalString;
 
 typedef enum InternalClassType {
 	INTERNAL_CLASS_OBJECT,
+	INTERNAL_CLASS_IMPORT,
 	INTERNAL_CLASS__COUNT
 } InternalClassType;
 
@@ -45,15 +49,15 @@ typedef struct VM {
 	ValueArray stack;
 	CallFrameArray frames;
 
-	Table globals;
 	Table strings;
 	Table nativeLibraries;
+	Table imports;
 
 	Value exception;
 	bool hasException;
 
-	ObjString* name;
-	ObjString* directory;
+	Module* modules;
+	ObjString* baseDirectory;
 
 	ObjString* internalStrings[INTERNAL_STR__COUNT];
 	ObjClass* internalExceptions[INTERNAL_EXCEPTION__COUNT];
@@ -81,10 +85,11 @@ void initVM(VM* vm);
 void freeVM(VM* vm);
 
 void push(VM* vm, Value value);
+Value peek(VM* vm, size_t distance);
 Value pop(VM* vm);
 FELINE_EXPORT void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...);
 
 void inheritClasses(VM* vm, ObjClass* subclass, ObjClass* superclass);
 
-InterpreterResult executeVM(VM* vm);
+InterpreterResult executeVM(VM* vm, size_t baseFrameIndex);
 InterpreterResult interpret(VM* vm, const char* source);

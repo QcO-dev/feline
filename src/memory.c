@@ -75,10 +75,20 @@ static void markRoots(VM* vm) {
 		markObject(vm, (Obj*)upvalue);
 	}
 
-	markTable(vm, &vm->globals);
+	
+	Module* mod = vm->modules;
+
+	while (mod != NULL) {
+		markTable(vm, &mod->globals);
+		markTable(vm, &mod->exports);
+		markObject(vm, (Obj*)mod->name);
+		markObject(vm, (Obj*)mod->directory);
+		mod = mod->next;
+	}
+
 	markTable(vm, &vm->nativeLibraries);
-	markObject(vm, (Obj*)&vm->directory);
-	markObject(vm, (Obj*)&vm->name);
+	markTable(vm, &vm->imports);
+	markObject(vm, (Obj*)&vm->baseDirectory);
 
 	markCompilerRoots(vm);
 	

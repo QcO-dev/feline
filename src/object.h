@@ -5,6 +5,7 @@
 #include "chunk.h"
 #include "table.h"
 #include "ffi/ffi.h"
+#include "module.h"
 
 typedef enum ObjType {
 	OBJ_STRING,
@@ -45,6 +46,7 @@ typedef struct ObjClosure {
 	ObjFunction* function;
 	ObjUpvalue** upvalues;
 	size_t upvalueCount;
+	Module* owner;
 } ObjClosure;
 
 typedef struct ObjNative {
@@ -95,7 +97,7 @@ static inline bool isObjType(Value value, ObjType type) {
 
 ObjFunction* newFunction(VM* vm);
 
-ObjClosure* newClosure(VM* vm, ObjFunction* function);
+ObjClosure* newClosure(VM* vm, Module* mod, ObjFunction* function);
 
 ObjUpvalue* newUpvalue(VM* vm, Value* slot);
 

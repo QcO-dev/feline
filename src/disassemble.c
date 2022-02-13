@@ -152,6 +152,9 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 		SIMPLE(TRY_END)
 		SIMPLE(BOUND_EXCEPTION)
 
+		CONSTANT(IMPORT)
+		CONSTANT(EXPORT)
+
 		SIMPLE(PRINT)
 		default: {
 			printf("Unknown opcode: %2X", opcode);

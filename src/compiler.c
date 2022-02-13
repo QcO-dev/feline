@@ -758,6 +758,20 @@ static void printStatement(Compiler* compiler) {
 	emitByte(compiler, OP_PRINT);
 }
 
+static void exportStatement(Compiler* compiler) {
+	expression(compiler);
+
+	consume(compiler, TOKEN_AS, "Expected 'as' after export value");
+
+	consume(compiler, TOKEN_IDENTIFIER, "Expected export bind name");
+
+	uint16_t bindName = identifierConstant(compiler, &compiler->previous);
+
+	emitOOInstruction(compiler, OP_EXPORT, bindName);
+
+	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after export name");
+}
+
 static void ifStatement(Compiler* compiler) {
 	consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
 
@@ -943,6 +957,9 @@ static void statement(Compiler* compiler) {
 	if (match(compiler, TOKEN_PRINT)) {
 		printStatement(compiler);
 	}
+	else if (match(compiler, TOKEN_EXPORT)) {
+		exportStatement(compiler);
+	}
 	else if (match(compiler, TOKEN_FOR)) {
 		forStatement(compiler);
 	}
@@ -1099,6 +1116,44 @@ static void functionDeclaration(Compiler* compiler) {
 	defineVariable(compiler, global);
 }
 
+static void importDeclaration(Compiler* compiler) {
+	char buffer[1024];
+	size_t length = 0;
+
+	do {
+		consume(compiler, TOKEN_IDENTIFIER, "Expected import name");
+
+		Token part = compiler->previous;
+
+		if (length + part.length + 1 > 1024) {
+			error(compiler, "Import path exceeds maximum length of 1024 characters");
+			break;
+		}
+
+		memcpy(buffer + length, part.start, part.length);
+		length += part.length;
+		buffer[length] = '/';
+		length += 1;
+	} while (match(compiler, TOKEN_DOT));
+
+	ObjString* path = copyString(compiler->vm, buffer, length - 1);
+	push(compiler->vm, OBJ_VAL(path));
+
+	if (match(compiler, TOKEN_AS)) {
+		consume(compiler, TOKEN_IDENTIFIER, "Expected import name");
+	}
+
+	uint16_t name = identifierConstant(compiler, &compiler->previous);
+
+	emitOOInstruction(compiler, OP_IMPORT, makeConstant(compiler, OBJ_VAL(path)));
+
+	pop(compiler->vm);
+
+	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after import declaration");
+
+	defineVariable(compiler, name);
+}
+
 static void nativeDeclaration(Compiler* compiler) {
 	uint16_t name = parseVariable(compiler, "Expected native function name");
 
@@ -1144,6 +1199,9 @@ static void declaration(Compiler* compiler) {
 	}
 	else if (match(compiler, TOKEN_FUNCTION)) {
 		functionDeclaration(compiler);
+	}
+	else if (match(compiler, TOKEN_IMPORT)) {
+		importDeclaration(compiler);
 	}
 	else if (match(compiler, TOKEN_NATIVE)) {
 		nativeDeclaration(compiler);
@@ -1192,14 +1250,17 @@ ParseRule rules[] = {
 	[TOKEN_NUMBER] = {number, NULL, PREC_NONE},
 
 	[TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
+	[TOKEN_AS] = {NULL, NULL, PREC_NONE},
 	[TOKEN_CATCH] = {NULL, NULL, PREC_NONE},
 	[TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
 	[TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
+	[TOKEN_EXPORT] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FALSE] = {literal, NULL, PREC_NONE},
 	[TOKEN_FINALLY] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FOR] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FUNCTION] = {NULL, NULL, PREC_NONE},
 	[TOKEN_IF] = {NULL, NULL, PREC_NONE},
+	[TOKEN_IMPORT] = {NULL, NULL, PREC_NONE},
 	[TOKEN_INSTANCEOF] = {NULL, binary, PREC_COMPARISON},
 	[TOKEN_NATIVE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_NULL] = {literal, NULL, PREC_NONE},
@@ -1217,7 +1278,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(51 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(54 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(FelineTokenType type) {
 	return &rules[type];
