@@ -50,6 +50,7 @@ typedef struct VM {
 
 	Table strings;
 	Table nativeLibraries;
+	Table imports;
 
 	Value exception;
 	bool hasException;

@@ -60,6 +60,7 @@ void initVM(VM* vm) {
 	initCallFrameArray(&vm->frames);
 	initTable(&vm->strings);
 	initTable(&vm->nativeLibraries);
+	initTable(&vm->imports);
 
 	// Forces the stack to resize before anything else is allocated
 	// Allows for push() and pop() to be used to stop values being GC'd.
@@ -85,6 +86,7 @@ void freeVM(VM* vm) {
 
 	freeTable(vm, &vm->strings);
 	freeTable(vm, &vm->nativeLibraries);
+	freeTable(vm, &vm->imports);
 	freeValueArray(vm, &vm->stack);
 	freeCallFrameArray(vm, &vm->frames);
 	freeObjects(vm);
@@ -993,6 +995,12 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				ObjString* realPath = makeStringf(vm, "%s%s.fn", vm->baseDirectory->str, givenPath->str);
 				pop(vm);
 
+				Value cachedImport;
+				if (tableGet(&vm->imports, realPath, &cachedImport)) {
+					push(vm, cachedImport);
+					break;
+				}
+
 				//TODO: Throw an error of failure instead of crashing
 				char* rawSource = readFile(realPath->str);
 
@@ -1006,7 +1014,6 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 
 				ObjFunction* function = compile(vm, source->str);
 
-				pop(vm);
 				pop(vm);
 
 				if (function == NULL) return INTERPRETER_COMPILE_ERROR;
@@ -1023,9 +1030,12 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				executeVM(vm, vm->frames.length - 1);
 
 				ObjInstance* importObj = newInstance(vm, vm->internalClasses[INTERNAL_CLASS_IMPORT]);
+				tableSet(vm, &vm->imports, realPath, OBJ_VAL(importObj));
+				pop(vm); // realPath
 				push(vm, OBJ_VAL(importObj));
 
 				tableAddAll(vm, &mod->exports, &importObj->fields);
+
 				break;
 			}
 

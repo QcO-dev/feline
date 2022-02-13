@@ -87,6 +87,7 @@ static void markRoots(VM* vm) {
 	}
 
 	markTable(vm, &vm->nativeLibraries);
+	markTable(vm, &vm->imports);
 	markObject(vm, (Obj*)&vm->baseDirectory);
 
 	markCompilerRoots(vm);
