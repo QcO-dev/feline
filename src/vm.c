@@ -286,14 +286,22 @@ static void defineMethod(VM* vm, ObjString* name) {
 	pop(vm);
 }
 
-static bool bindMethod(VM* vm, ObjClass* clazz, ObjString* name) {
+static bool bindMethod(VM* vm, ObjInstance* instance, ObjClass* clazz, ObjString* name) {
 	Value method;
 
 	if (!tableGet(&clazz->methods, name, &method)) {
 		return false;
 	}
 
-	ObjBoundMethod* bound = newBoundMethod(vm, peek(vm, 0), AS_CLOSURE(method));
+	Obj* bound;
+	if (IS_NATIVE(method)) {
+		ObjNative* native = AS_NATIVE_OBJ(method);
+		native->bound = OBJ_VAL(instance);
+		bound = (Obj*)native;
+	}
+	else {
+		bound = (Obj*)newBoundMethod(vm, peek(vm, 0), AS_CLOSURE(method));
+	}
 
 	pop(vm);
 	push(vm, OBJ_VAL(bound));
@@ -766,7 +774,7 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 					break;
 				}
 
-				if (!bindMethod(vm, instance->clazz, name)) {
+				if (!bindMethod(vm, instance, instance->clazz, name)) {
 					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_PROPERTY], "Undefined property '%s'", name->str);
 					break;
 				}
@@ -804,7 +812,7 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				ObjString* name = READ_STRING();
 				ObjClass* superclass = AS_CLASS(pop(vm));
 
-				if (!bindMethod(vm, superclass, name)) {
+				if (!bindMethod(vm, AS_INSTANCE(vm->stack.items[frame->slotsOffset]), superclass, name)) {
 					break;
 				}
 				break;
@@ -930,7 +938,7 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 					}
 
 					pop(vm); // Pop the propertyName off
-					if (!bindMethod(vm, instance->clazz, propertyName)) {
+					if (!bindMethod(vm, instance, instance->clazz, propertyName)) {
 						push(vm, NULL_VAL);
 					}
 				}
