@@ -1139,6 +1139,10 @@ static void importDeclaration(Compiler* compiler) {
 	ObjString* path = copyString(compiler->vm, buffer, length - 1);
 	push(compiler->vm, OBJ_VAL(path));
 
+	if (match(compiler, TOKEN_AS)) {
+		consume(compiler, TOKEN_IDENTIFIER, "Expected import name");
+	}
+
 	uint16_t name = identifierConstant(compiler, &compiler->previous);
 
 	emitOOInstruction(compiler, OP_IMPORT, makeConstant(compiler, OBJ_VAL(path)));
