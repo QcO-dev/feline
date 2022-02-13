@@ -87,5 +87,5 @@ FELINE_EXPORT void throwException(VM* vm, ObjClass* exceptionType, const char* f
 
 void inheritClasses(VM* vm, ObjClass* subclass, ObjClass* superclass);
 
-InterpreterResult executeVM(VM* vm);
+InterpreterResult executeVM(VM* vm, size_t baseFrameIndex);
 InterpreterResult interpret(VM* vm, const char* source);

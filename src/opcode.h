@@ -65,6 +65,8 @@ typedef enum Opcode {
 	OP_TRY_BEGIN,
 	OP_TRY_END,
 	OP_BOUND_EXCEPTION,
+	//Imports
+	OP_IMPORT,
 	// Misc.
 	OP_PRINT,
 

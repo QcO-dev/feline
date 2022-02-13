@@ -157,6 +157,7 @@ static FelineTokenType identifierType(Lexer* lexer) {
 			if (lexer->current - lexer->start > 1) {
 				switch (lexer->start[1]) {
 					case 'f': return checkKeyword(lexer, 2, 0, "", TOKEN_IF);
+					case 'm': return checkKeyword(lexer, 2, 4, "port", TOKEN_IMPORT);
 					case 'n': return checkKeyword(lexer, 2, 8, "stanceof", TOKEN_INSTANCEOF);
 				}
 			}

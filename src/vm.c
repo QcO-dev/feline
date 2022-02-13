@@ -2,6 +2,7 @@
 #include "compiler.h"
 #include "object.h"
 #include "memory.h"
+#include "file.h"
 #include "builtin/objectclass.h"
 #include <stdio.h>
 #include <stdarg.h>
@@ -343,7 +344,7 @@ static bool validateIndex(VM* vm, size_t length, double index, size_t* realIndex
 	return true;
 }
 
-InterpreterResult executeVM(VM* vm) {
+InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 	CallFrame* frame = &vm->frames.items[vm->frames.length - 1];
 	Module* currentModule = frame->closure->owner;
 
@@ -405,7 +406,7 @@ InterpreterResult executeVM(VM* vm) {
 
 				vm->frames.length--;
 
-				if (vm->frames.length == 0) {
+				if (vm->frames.length == baseFrameIndex) {
 					pop(vm); // Stack Trace
 					pop(vm); // The script function
 					
@@ -657,7 +658,7 @@ InterpreterResult executeVM(VM* vm) {
 
 				vm->frames.length--;
 
-				if (vm->frames.length == 0) {
+				if (vm->frames.length == baseFrameIndex) {
 					pop(vm); // The script function
 					return INTERPRETER_OK;
 				}
@@ -981,6 +982,45 @@ InterpreterResult executeVM(VM* vm) {
 				push(vm, vm->exception);
 				break;
 			}
+
+			case OP_IMPORT: {
+				ObjString* givenPath = READ_STRING();
+				push(vm, OBJ_VAL(givenPath));
+
+				ObjString* realPath = makeStringf(vm, "%s%s.fn", vm->baseDirectory->str, givenPath->str);
+				pop(vm);
+
+				//TODO: Throw an error of failure instead of crashing
+				char* rawSource = readFile(realPath->str);
+
+				push(vm, OBJ_VAL(realPath));
+				ObjString* source = takeString(vm, rawSource, strlen(rawSource));
+				push(vm, OBJ_VAL(source));
+
+				Module* mod = ALLOCATE(vm, Module, 1);
+				initModule(vm, mod);
+				splitPathToNameAndDirectory(vm, mod, realPath->str);
+
+				ObjFunction* function = compile(vm, source->str);
+
+				pop(vm);
+				pop(vm);
+
+				if (function == NULL) return INTERPRETER_COMPILE_ERROR;
+
+				push(vm, OBJ_VAL(function));
+				ObjClosure* closure = newClosure(vm, mod, function);
+				pop(vm);
+				push(vm, OBJ_VAL(closure));
+
+				// Set the script as the execution context
+				callClosure(vm, closure, 0);
+
+				//TODO: Handle an error from runtime
+				executeVM(vm, vm->frames.length - 1);
+
+				break;
+			}
 		}
 
 	}
@@ -1005,5 +1045,5 @@ InterpreterResult interpret(VM* vm, const char* source) {
 	// Set the script as the execution context
 	callClosure(vm, closure, 0);
 
-	return executeVM(vm);
+	return executeVM(vm, 0);
 }

@@ -80,8 +80,8 @@ static void markRoots(VM* vm) {
 
 	while (mod != NULL) {
 		markTable(vm, &mod->globals);
-		markObject(vm, (Obj*)&mod->name);
-		markObject(vm, (Obj*)&mod->directory);
+		markObject(vm, (Obj*)mod->name);
+		markObject(vm, (Obj*)mod->directory);
 		mod = mod->next;
 	}
 

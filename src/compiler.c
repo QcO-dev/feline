@@ -1099,6 +1099,16 @@ static void functionDeclaration(Compiler* compiler) {
 	defineVariable(compiler, global);
 }
 
+static void importDeclaration(Compiler* compiler) {
+	uint16_t name = parseVariable(compiler, "Expected import name");
+
+	emitOOInstruction(compiler, OP_IMPORT, name);
+
+	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after import declaration");
+
+	defineVariable(compiler, name);
+}
+
 static void nativeDeclaration(Compiler* compiler) {
 	uint16_t name = parseVariable(compiler, "Expected native function name");
 
@@ -1144,6 +1154,9 @@ static void declaration(Compiler* compiler) {
 	}
 	else if (match(compiler, TOKEN_FUNCTION)) {
 		functionDeclaration(compiler);
+	}
+	else if (match(compiler, TOKEN_IMPORT)) {
+		importDeclaration(compiler);
 	}
 	else if (match(compiler, TOKEN_NATIVE)) {
 		nativeDeclaration(compiler);
@@ -1200,6 +1213,7 @@ ParseRule rules[] = {
 	[TOKEN_FOR] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FUNCTION] = {NULL, NULL, PREC_NONE},
 	[TOKEN_IF] = {NULL, NULL, PREC_NONE},
+	[TOKEN_IMPORT] = {NULL, NULL, PREC_NONE},
 	[TOKEN_INSTANCEOF] = {NULL, binary, PREC_COMPARISON},
 	[TOKEN_NATIVE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_NULL] = {literal, NULL, PREC_NONE},
@@ -1217,7 +1231,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(51 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(52 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(FelineTokenType type) {
 	return &rules[type];
