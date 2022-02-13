@@ -1137,10 +1137,13 @@ static void importDeclaration(Compiler* compiler) {
 	} while (match(compiler, TOKEN_DOT));
 
 	ObjString* path = copyString(compiler->vm, buffer, length - 1);
+	push(compiler->vm, OBJ_VAL(path));
 
 	uint16_t name = identifierConstant(compiler, &compiler->previous);
 
 	emitOOInstruction(compiler, OP_IMPORT, makeConstant(compiler, OBJ_VAL(path)));
+
+	pop(compiler->vm);
 
 	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after import declaration");
 

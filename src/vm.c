@@ -375,10 +375,22 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 	for (;;) {
 
 		if (vm->hasException) {
+
+			ObjList* stackTrace;
 			ValueArray stackTraceArray;
+			if (IS_INSTANCE(vm->exception) && instanceof(AS_INSTANCE(vm->exception), vm->internalExceptions[INTERNAL_EXCEPTION_BASE])) {
+				Value v;
+				if (tableGet(&AS_INSTANCE(vm->exception)->fields, vm->internalStrings[INTERNAL_STR_STACKTRACE], &v)) {
+					if (IS_LIST(v)) {
+						stackTrace = AS_LIST(v);
+						goto previous_stack_trace_found;
+					}
+				}
+			}
 			initValueArray(&stackTraceArray);
 
-			ObjList* stackTrace = newList(vm, stackTraceArray);
+			stackTrace = newList(vm, stackTraceArray);
+		previous_stack_trace_found:
 
 			push(vm, OBJ_VAL(stackTrace));
 			while (vm->hasException) {
@@ -386,7 +398,9 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				ObjFunction* function = frame->closure->function;
 				size_t instruction = frame->ip - function->chunk.bytecode.items - 1;
 
-				ObjString* tracer = makeStringf(vm, "[%zu] in %s", getLineOfInstruction(&function->chunk, instruction), function->name != NULL ? function->name->str : "<script>");
+				ObjString* tracer = makeStringf(vm, "[%s%s.fn:%zu] in %s", 
+					currentModule->directory->str, currentModule->name->str,
+					getLineOfInstruction(&function->chunk, instruction), function->name != NULL ? function->name->str : "<script>");
 				push(vm, OBJ_VAL(tracer));
 				writeValueArray(vm, &stackTrace->items, peek(vm, 0));
 				pop(vm);
@@ -414,6 +428,13 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				if (vm->frames.length == baseFrameIndex) {
 					pop(vm); // Stack Trace
 					pop(vm); // The script function
+
+					if (baseFrameIndex != 0) {
+						if (IS_INSTANCE(vm->exception) && instanceof(AS_INSTANCE(vm->exception), vm->internalExceptions[INTERNAL_EXCEPTION_BASE])) {
+							tableSet(vm, &AS_INSTANCE(vm->exception)->fields, vm->internalStrings[INTERNAL_STR_STACKTRACE], OBJ_VAL(stackTrace));
+						}
+						return INTERPRETER_RUNTIME_ERROR;
+					}
 					
 					if (IS_INSTANCE(vm->exception) && instanceof(AS_INSTANCE(vm->exception), vm->internalExceptions[INTERNAL_EXCEPTION_BASE])) {
 						ObjInstance* exception = AS_INSTANCE(vm->exception);
@@ -1027,14 +1048,22 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				callClosure(vm, closure, 0);
 
 				//TODO: Handle an error from runtime
-				executeVM(vm, vm->frames.length - 1);
+				InterpreterResult result = executeVM(vm, vm->frames.length - 1);
+
+				if (result == INTERPRETER_RUNTIME_ERROR) {
+					break;
+				}
 
 				ObjInstance* importObj = newInstance(vm, vm->internalClasses[INTERNAL_CLASS_IMPORT]);
+				push(vm, OBJ_VAL(importObj));
 				tableSet(vm, &vm->imports, realPath, OBJ_VAL(importObj));
-				pop(vm); // realPath
 				push(vm, OBJ_VAL(importObj));
 
 				tableAddAll(vm, &mod->exports, &importObj->fields);
+
+				pop(vm);
+				pop(vm);
+				push(vm, OBJ_VAL(importObj));
 
 				break;
 			}

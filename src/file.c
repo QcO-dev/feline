@@ -50,6 +50,14 @@ char* readFile(const char* path) {
 	return charBuffer;
 }
 
+void inplaceReplaceSlash(char* str) {
+	size_t offset = 0;
+	while (str[offset] != '\0') {
+		if (str[offset] == '\\') str[offset] = '/';
+		offset++;
+	}
+}
+
 void splitPathToNameAndDirectory(VM* vm, Module* mod, const char* path) {
 #ifdef _WIN32
 	size_t pathLength = strlen(path);
@@ -58,6 +66,8 @@ void splitPathToNameAndDirectory(VM* vm, Module* mod, const char* path) {
 	char* drive = reallocate(vm, NULL, 0, _MAX_DRIVE);
 
 	_splitpath(path, drive, dir, fname, NULL);
+
+	inplaceReplaceSlash(dir);
 
 	mod->directory = makeStringf(vm, "%s%s", drive, dir);
 	mod->name = takeString(vm, fname, strlen(fname));
