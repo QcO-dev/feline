@@ -3,6 +3,7 @@
 #include "chunk.h"
 #include "table.h"
 #include "object.h"
+#include "module.h"
 #include "builtin/exception.h"
 #include "ffi/felineffi.h"
 
@@ -45,15 +46,14 @@ typedef struct VM {
 	ValueArray stack;
 	CallFrameArray frames;
 
-	Table globals;
 	Table strings;
 	Table nativeLibraries;
 
 	Value exception;
 	bool hasException;
 
-	ObjString* name;
-	ObjString* directory;
+	Module* modules;
+	ObjString* baseDirectory;
 
 	ObjString* internalStrings[INTERNAL_STR__COUNT];
 	ObjClass* internalExceptions[INTERNAL_EXCEPTION__COUNT];
@@ -81,6 +81,7 @@ void initVM(VM* vm);
 void freeVM(VM* vm);
 
 void push(VM* vm, Value value);
+Value peek(VM* vm, size_t distance);
 Value pop(VM* vm);
 FELINE_EXPORT void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...);
 

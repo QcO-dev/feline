@@ -3,6 +3,7 @@
 #include "memory.h"
 #include "opcode.h"
 #include "vm.h"
+#include "module.h"
 
 #ifndef _WIN32
 #include <string.h>
@@ -52,7 +53,7 @@ static char* readFile(const char* path) {
 	return charBuffer;
 }
 
-static void splitPathToNameAndDirectory(VM* vm, const char* path) {
+static void splitPathToNameAndDirectory(VM* vm, Module* mod, const char* path) {
 #ifdef _WIN32
 	size_t pathLength = strlen(path);
 	char* dir = reallocate(vm, NULL, 0, _MAX_DIR);
@@ -61,8 +62,8 @@ static void splitPathToNameAndDirectory(VM* vm, const char* path) {
 
 	_splitpath(path, drive, dir, fname, NULL);
 
-	vm->directory = makeStringf(vm, "%s%s", drive, dir);
-	vm->name = takeString(vm, fname, strlen(fname));
+	mod->directory = makeStringf(vm, "%s%s", drive, dir);
+	mod->name = takeString(vm, fname, strlen(fname));
 
 	FREE_ARRAY(vm, char, dir, strlen(dir));
 	FREE_ARRAY(vm, char, drive, strlen(drive));
@@ -87,7 +88,14 @@ static void runFile(const char* path) {
 	char* source = readFile(path);
 	VM vm;
 	initVM(&vm);
-	splitPathToNameAndDirectory(&vm, path);
+
+	Module* mainModule = ALLOCATE(&vm, Module, 1);
+	initModule(&vm, mainModule);
+
+	vm.modules = mainModule;
+
+	splitPathToNameAndDirectory(&vm, mainModule, path);
+	vm.baseDirectory = mainModule->directory;
 	InterpreterResult result = interpret(&vm, source);
 	freeVM(&vm);
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "../common.h"
+#include "../module.h"
 
 typedef struct VM VM;
 
@@ -16,3 +17,4 @@ typedef enum InternalExceptionType {
 } InternalExceptionType;
 
 void defineExceptionClasses(VM* vm);
+void bindExceptionClasses(VM* vm, Module* mod);

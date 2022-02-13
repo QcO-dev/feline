@@ -13,40 +13,6 @@
 
 DEFINE_DYNAMIC_ARRAY(CallFrame, CallFrame)
 
-// TODO: Move the native stuff out of vm.c
-
-#include <time.h>
-
-Value peek(VM* vm, size_t distance);
-
-static void defineNative(VM* vm, const char* name, NativeFunction function, size_t arity) {
-	push(vm, OBJ_VAL(copyString(vm, name, strlen(name))));
-	push(vm, OBJ_VAL(newNative(vm, function, arity)));
-	tableSet(vm, &vm->globals, AS_STRING(peek(vm, 1)), peek(vm, 0));
-	pop(vm);
-	pop(vm);
-}
-
-static Value clockNative(VM* vm, uint8_t argCount, Value* args) {
-	return NUMBER_VAL((double)clock() / 1000);
-}
-
-//TODO:
-//  len() is temporary until we can access methods on lists & strings :-)
-static Value lenNative(VM* vm, uint8_t argCount, Value* args) {
-	if (IS_LIST(args[0])) {
-		return NUMBER_VAL((double)AS_LIST(args[0])->items.length);
-	}
-	else if (IS_STRING(args[0])) {
-		return NUMBER_VAL((double)AS_STRING(args[0])->length);
-	}
-	
-	throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Expected argument to be a list or string");
-	return NULL_VAL;
-}
-
-// TODO: Remove all above until the over to-do
-
 void buildInternalStrings(VM* vm) {
 	vm->internalStrings[INTERNAL_STR_NEW] = copyString(vm, "new", 3);
 	vm->internalStrings[INTERNAL_STR_STACKTRACE] = copyString(vm, "stackTrace", 10);
@@ -78,8 +44,8 @@ void initVM(VM* vm) {
 	vm->openUpvalues = NULL;
 	vm->lowestLevelCompiler = NULL;
 	
-	vm->name = NULL;
-	vm->directory = NULL;
+	vm->baseDirectory = NULL;
+	vm->modules = NULL;
 	
 	for (size_t i = 0; i < INTERNAL_STR__COUNT; i++) vm->internalStrings[i] = NULL;
 	for (size_t i = 0; i < INTERNAL_EXCEPTION__COUNT; i++) vm->internalExceptions[i] = NULL;
@@ -90,7 +56,6 @@ void initVM(VM* vm) {
 	initValueArray(&vm->stack);
 	initCallFrameArray(&vm->frames);
 	initTable(&vm->strings);
-	initTable(&vm->globals);
 	initTable(&vm->nativeLibraries);
 
 	// Forces the stack to resize before anything else is allocated
@@ -103,14 +68,18 @@ void initVM(VM* vm) {
 	defineObjectClass(vm);
 
 	defineExceptionClasses(vm);
-
-	defineNative(vm, "clock", clockNative, 0);
-	defineNative(vm, "len", lenNative, 1);
 }
 
 void freeVM(VM* vm) {
+	Module* mod = vm->modules;
+	while (mod != NULL) {
+		freeTable(vm, &mod->globals);
+		Module* next = mod->next;
+		FREE(vm, Module, mod);
+		mod = next;
+	}
+
 	freeTable(vm, &vm->strings);
-	freeTable(vm, &vm->globals);
 	freeTable(vm, &vm->nativeLibraries);
 	freeValueArray(vm, &vm->stack);
 	freeCallFrameArray(vm, &vm->frames);
@@ -376,6 +345,7 @@ static bool validateIndex(VM* vm, size_t length, double index, size_t* realIndex
 
 InterpreterResult executeVM(VM* vm) {
 	CallFrame* frame = &vm->frames.items[vm->frames.length - 1];
+	Module* currentModule = frame->closure->owner;
 
 #define READ_BYTE() (*frame->ip++)
 #define READ_SHORT() (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
@@ -470,6 +440,7 @@ InterpreterResult executeVM(VM* vm) {
 				push(vm, OBJ_VAL(stackTrace));
 
 				frame = &vm->frames.items[vm->frames.length - 1];
+				currentModule = frame->closure->owner;
 			}
 		}
 
@@ -502,7 +473,7 @@ InterpreterResult executeVM(VM* vm) {
 
 			case OP_DEFINE_GLOBAL: {
 				ObjString* name = READ_STRING();
-				tableSet(vm, &vm->globals, name, peek(vm, 0));
+				tableSet(vm, &currentModule->globals, name, peek(vm, 0));
 				pop(vm);
 				break;
 			}
@@ -510,7 +481,7 @@ InterpreterResult executeVM(VM* vm) {
 			case OP_ACCESS_GLOBAL: {
 				ObjString* name = READ_STRING();
 				Value value;
-				if (!tableGet(&vm->globals, name, &value)) {
+				if (!tableGet(&currentModule->globals, name, &value)) {
 					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_UNDEFINED_VARIABLE], "Undefined variable '%s'", name->str);
 					break;
 				}
@@ -521,8 +492,8 @@ InterpreterResult executeVM(VM* vm) {
 			case OP_ASSIGN_GLOBAL: {
 				ObjString* name = READ_STRING();
 
-				if (tableSet(vm, &vm->globals, name, peek(vm, 0))) {
-					tableDelete(vm, &vm->globals, name);
+				if (tableSet(vm, &currentModule->globals, name, peek(vm, 0))) {
+					tableDelete(vm, &currentModule->globals, name);
 					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_UNDEFINED_VARIABLE], "Undefined variable '%s'", name->str);
 					break;
 				}
@@ -652,7 +623,7 @@ InterpreterResult executeVM(VM* vm) {
 
 			case OP_CLOSURE: {
 				ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-				ObjClosure* closure = newClosure(vm, function);
+				ObjClosure* closure = newClosure(vm, currentModule, function);
 				push(vm, OBJ_VAL(closure));
 
 				for (size_t i = 0; i < closure->upvalueCount; i++) {
@@ -675,6 +646,7 @@ InterpreterResult executeVM(VM* vm) {
 					break;
 				}
 				frame = &vm->frames.items[vm->frames.length - 1];
+				currentModule = frame->closure->owner;
 				break;
 			}
 
@@ -695,6 +667,7 @@ InterpreterResult executeVM(VM* vm) {
 				push(vm, result);
 
 				frame = &vm->frames.items[vm->frames.length - 1];
+				currentModule = frame->closure->owner;
 				break;
 			}
 
@@ -702,7 +675,7 @@ InterpreterResult executeVM(VM* vm) {
 				ObjString* name = READ_STRING();
 				uint8_t arity = READ_BYTE();
 				
-				NativeLibrary library = loadNativeLibrary(vm, makeStringf(vm, "%s%s." NATIVE_LIBRARY_EXT, vm->directory->str, vm->name->str));
+				NativeLibrary library = loadNativeLibrary(vm, makeStringf(vm, "%s%s." NATIVE_LIBRARY_EXT, currentModule->directory->str, currentModule->name->str));
 
 				if (library == NULL) break;
 
@@ -810,6 +783,7 @@ InterpreterResult executeVM(VM* vm) {
 					break;
 				}
 				frame = &vm->frames.items[vm->frames.length - 1];
+				currentModule = frame->closure->owner;
 				break;
 			}
 
@@ -823,6 +797,7 @@ InterpreterResult executeVM(VM* vm) {
 					break;
 				}
 				frame = &vm->frames.items[vm->frames.length - 1];
+				currentModule = frame->closure->owner;
 				break;
 			}
 
@@ -836,6 +811,7 @@ InterpreterResult executeVM(VM* vm) {
 				// Which may result in a speed-up in tight loops
 				callValue(vm, OBJ_VAL(vm->internalClasses[INTERNAL_CLASS_OBJECT]), 0);
 				frame = &vm->frames.items[vm->frames.length - 1];
+				currentModule = frame->closure->owner;
 				break;
 			}
 
@@ -1022,7 +998,7 @@ InterpreterResult interpret(VM* vm, const char* source) {
 	if (function == NULL) return INTERPRETER_COMPILE_ERROR;
 
 	push(vm, OBJ_VAL(function));
-	ObjClosure* closure = newClosure(vm, function);
+	ObjClosure* closure = newClosure(vm, vm->modules, function);
 	pop(vm);
 	push(vm, OBJ_VAL(closure));
 
