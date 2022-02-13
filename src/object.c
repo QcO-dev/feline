@@ -67,6 +67,7 @@ ObjNative* newNative(VM* vm, NativeFunction function, size_t arity) {
 	ObjNative* native = ALLOCATE_OBJ(vm, ObjNative, OBJ_NATIVE);
 	native->function = function;
 	native->arity = arity;
+	native->bound = NULL_VAL;
 	return native;
 }
 

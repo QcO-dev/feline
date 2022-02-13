@@ -230,7 +230,7 @@ static bool callValue(VM* vm, Value callee, uint8_t argCount) {
 					return false;
 				}
 
-				Value result = native(vm, argCount, &vm->stack.items[vm->stack.length - argCount]);
+				Value result = native(vm, nativeObj->bound, argCount, &vm->stack.items[vm->stack.length - argCount]);
 				vm->stack.length -= (size_t)argCount + 1;
 				
 				push(vm, result);
@@ -300,12 +300,19 @@ static bool bindMethod(VM* vm, ObjClass* clazz, ObjString* name) {
 	return true;
 }
 
-static bool invokeFromClass(VM* vm, ObjClass* clazz, ObjString* name, uint8_t argCount) {
+static bool invokeFromClass(VM* vm, ObjInstance* instance, ObjClass* clazz, ObjString* name, uint8_t argCount) {
 	Value method;
 	if (!tableGet(&clazz->methods, name, &method)) {
 		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_PROPERTY], "Undefined property '%s'", name->str);
 		return false;
 	}
+
+	if (IS_NATIVE(method)) {
+		ObjNative* native = AS_NATIVE_OBJ(method);
+		native->bound = OBJ_VAL(instance);
+		return callValue(vm, OBJ_VAL(native), argCount);
+	}
+
 	return callClosure(vm, AS_CLOSURE(method), argCount);
 }
 
@@ -325,7 +332,7 @@ static bool invoke(VM* vm, ObjString* name, uint8_t argCount) {
 		return callValue(vm, value, argCount);
 	}
 
-	return invokeFromClass(vm, instance->clazz, name, argCount);
+	return invokeFromClass(vm, instance, instance->clazz, name, argCount);
 }
 
 static bool validateIndex(VM* vm, size_t length, double index, size_t* realIndex) {
@@ -821,7 +828,7 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 
 				ObjClass* superclass = AS_CLASS(pop(vm));
 
-				if (!invokeFromClass(vm, superclass, method, argCount)) {
+				if (!invokeFromClass(vm, AS_INSTANCE(vm->stack.items[frame->slotsOffset]), superclass, method, argCount)) {
 					break;
 				}
 				frame = &vm->frames.items[vm->frames.length - 1];

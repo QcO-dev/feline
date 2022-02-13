@@ -53,6 +53,7 @@ typedef struct ObjNative {
 	Obj obj;
 	NativeFunction function;
 	size_t arity;
+	Value bound;
 } ObjNative;
 
 typedef struct ObjClass {
