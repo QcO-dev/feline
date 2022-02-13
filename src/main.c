@@ -16,6 +16,10 @@ static void runFile(const char* path) {
 
 	splitPathToNameAndDirectory(&vm, mainModule, path);
 	vm.baseDirectory = mainModule->directory;
+	ObjString* mainName = copyString(&vm, "$main", 5);
+	push(&vm, OBJ_VAL(mainName));
+	tableSet(&vm, &mainModule->globals, vm.internalStrings[INTERNAL_STR_THIS_MODULE], OBJ_VAL(mainName));
+	pop(&vm);
 	InterpreterResult result = interpret(&vm, source);
 	freeVM(&vm);
 

@@ -32,6 +32,7 @@ void buildInternalStrings(VM* vm) {
 
 	vm->internalStrings[INTERNAL_STR_OBJECT] = copyString(vm, "Object", 6);
 	vm->internalStrings[INTERNAL_STR_IMPORT] = copyString(vm, "Import", 6);
+	vm->internalStrings[INTERNAL_STR_THIS_MODULE] = copyString(vm, "THIS_MODULE", 11);
 }
 
 void initVM(VM* vm) {
@@ -1032,6 +1033,7 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				Module* mod = ALLOCATE(vm, Module, 1);
 				initModule(vm, mod);
 				splitPathToNameAndDirectory(vm, mod, realPath->str);
+				tableSet(vm, &mod->globals, vm->internalStrings[INTERNAL_STR_THIS_MODULE], OBJ_VAL(mod->name));
 
 				ObjFunction* function = compile(vm, source->str);
 
