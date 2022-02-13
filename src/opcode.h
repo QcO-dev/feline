@@ -67,6 +67,7 @@ typedef enum Opcode {
 	OP_BOUND_EXCEPTION,
 	//Imports
 	OP_IMPORT,
+	OP_EXPORT,
 	// Misc.
 	OP_PRINT,
 

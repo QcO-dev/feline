@@ -153,6 +153,7 @@ size_t disassembleInstruction(VM* vm, Chunk* chunk, size_t offset) {
 		SIMPLE(BOUND_EXCEPTION)
 
 		CONSTANT(IMPORT)
+		CONSTANT(EXPORT)
 
 		SIMPLE(PRINT)
 		default: {

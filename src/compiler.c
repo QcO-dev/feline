@@ -758,6 +758,20 @@ static void printStatement(Compiler* compiler) {
 	emitByte(compiler, OP_PRINT);
 }
 
+static void exportStatement(Compiler* compiler) {
+	expression(compiler);
+
+	consume(compiler, TOKEN_AS, "Expected 'as' after export value");
+
+	consume(compiler, TOKEN_IDENTIFIER, "Expected export bind name");
+
+	uint16_t bindName = identifierConstant(compiler, &compiler->previous);
+
+	emitOOInstruction(compiler, OP_EXPORT, bindName);
+
+	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after export name");
+}
+
 static void ifStatement(Compiler* compiler) {
 	consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
 
@@ -942,6 +956,9 @@ static void blockStatement(Compiler* compiler) {
 static void statement(Compiler* compiler) {
 	if (match(compiler, TOKEN_PRINT)) {
 		printStatement(compiler);
+	}
+	else if (match(compiler, TOKEN_EXPORT)) {
+		exportStatement(compiler);
 	}
 	else if (match(compiler, TOKEN_FOR)) {
 		forStatement(compiler);
@@ -1205,9 +1222,11 @@ ParseRule rules[] = {
 	[TOKEN_NUMBER] = {number, NULL, PREC_NONE},
 
 	[TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
+	[TOKEN_AS] = {NULL, NULL, PREC_NONE},
 	[TOKEN_CATCH] = {NULL, NULL, PREC_NONE},
 	[TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
 	[TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
+	[TOKEN_EXPORT] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FALSE] = {literal, NULL, PREC_NONE},
 	[TOKEN_FINALLY] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FOR] = {NULL, NULL, PREC_NONE},
@@ -1231,7 +1250,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(52 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(54 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(FelineTokenType type) {
 	return &rules[type];

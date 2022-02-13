@@ -4,6 +4,7 @@
 #include "memory.h"
 #include "file.h"
 #include "builtin/objectclass.h"
+#include "builtin/importclass.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -30,6 +31,7 @@ void buildInternalStrings(VM* vm) {
 	vm->internalStrings[INTERNAL_STR_REASON] = copyString(vm, "reason", 6);
 
 	vm->internalStrings[INTERNAL_STR_OBJECT] = copyString(vm, "Object", 6);
+	vm->internalStrings[INTERNAL_STR_IMPORT] = copyString(vm, "Import", 6);
 }
 
 void initVM(VM* vm) {
@@ -67,6 +69,7 @@ void initVM(VM* vm) {
 	buildInternalStrings(vm);
 
 	defineObjectClass(vm);
+	defineImportClass(vm);
 
 	defineExceptionClasses(vm);
 }
@@ -74,7 +77,7 @@ void initVM(VM* vm) {
 void freeVM(VM* vm) {
 	Module* mod = vm->modules;
 	while (mod != NULL) {
-		freeTable(vm, &mod->globals);
+		freeModule(vm, mod);
 		Module* next = mod->next;
 		FREE(vm, Module, mod);
 		mod = next;
@@ -1019,6 +1022,17 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				//TODO: Handle an error from runtime
 				executeVM(vm, vm->frames.length - 1);
 
+				ObjInstance* importObj = newInstance(vm, vm->internalClasses[INTERNAL_CLASS_IMPORT]);
+				push(vm, OBJ_VAL(importObj));
+
+				tableAddAll(vm, &mod->exports, &importObj->fields);
+				break;
+			}
+
+			case OP_EXPORT: {
+				ObjString* name = READ_STRING();
+				tableSet(vm, &currentModule->exports, name, peek(vm, 0));
+				pop(vm);
 				break;
 			}
 		}

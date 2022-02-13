@@ -132,6 +132,7 @@ static Token number(Lexer* lexer) {
 
 static FelineTokenType identifierType(Lexer* lexer) {
 	switch (lexer->start[0]) {
+		case 'a': return checkKeyword(lexer, 1, 1, "s", TOKEN_AS);
 		case 'c': {
 			if (lexer->current - lexer->start > 1) {
 				switch (lexer->start[1]) {
@@ -141,7 +142,15 @@ static FelineTokenType identifierType(Lexer* lexer) {
 			}
 			break;
 		}
-		case 'e': return checkKeyword(lexer, 1, 3, "lse", TOKEN_ELSE);
+		case 'e': {
+			if (lexer->current - lexer->start > 1) {
+				switch (lexer->start[1]) {
+					case 'l': return checkKeyword(lexer, 2, 2, "se", TOKEN_ELSE);
+					case 'x': return checkKeyword(lexer, 2, 4, "port", TOKEN_EXPORT);
+				}
+			}
+			break;
+		}
 		case 'f': {
 			if (lexer->current - lexer->start > 1) {
 				switch (lexer->start[1]) {
