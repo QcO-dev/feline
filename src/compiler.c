@@ -1117,9 +1117,30 @@ static void functionDeclaration(Compiler* compiler) {
 }
 
 static void importDeclaration(Compiler* compiler) {
-	uint16_t name = parseVariable(compiler, "Expected import name");
+	char buffer[1024];
+	size_t length = 0;
 
-	emitOOInstruction(compiler, OP_IMPORT, name);
+	do {
+		consume(compiler, TOKEN_IDENTIFIER, "Expected import name");
+
+		Token part = compiler->previous;
+
+		if (length + part.length + 1 > 1024) {
+			error(compiler, "Import path exceeds maximum length of 1024 characters");
+			break;
+		}
+
+		memcpy(buffer + length, part.start, part.length);
+		length += part.length;
+		buffer[length] = '/';
+		length += 1;
+	} while (match(compiler, TOKEN_DOT));
+
+	ObjString* path = copyString(compiler->vm, buffer, length - 1);
+
+	uint16_t name = identifierConstant(compiler, &compiler->previous);
+
+	emitOOInstruction(compiler, OP_IMPORT, makeConstant(compiler, OBJ_VAL(path)));
 
 	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after import declaration");
 
