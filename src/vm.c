@@ -204,6 +204,12 @@ static bool callValue(VM* vm, Value callee, uint8_t argCount) {
 
 				Value initializer;
 				if (tableGet(&clazz->methods, vm->internalStrings[INTERNAL_STR_NEW], &initializer)) {
+					if (IS_NATIVE(initializer)) {
+						ObjNative* native = AS_NATIVE_OBJ(initializer);
+						native->bound = vm->stack.items[vm->stack.length - argCount - 1];
+						return callValue(vm, OBJ_VAL(native), argCount);
+					}
+
 					return callClosure(vm, AS_CLOSURE(initializer), argCount);
 				}
 				else if (argCount != 0) {
