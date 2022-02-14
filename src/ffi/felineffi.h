@@ -17,4 +17,8 @@
 #define FELINE_IMPORT  __declspec(dllimport)
 #endif
 
+typedef struct InstanceData {
+	void(*freeData)(struct InstanceData*);
+} InstanceData;
+
 #endif

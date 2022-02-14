@@ -87,6 +87,7 @@ ObjInstance* newInstance(VM* vm, ObjClass* clazz) {
 	ObjInstance* instance = ALLOCATE_OBJ(vm, ObjInstance, OBJ_INSTANCE);
 	instance->clazz = clazz;
 	initTable(&instance->fields);
+	instance->nativeData = NULL;
 	return instance;
 }
 
