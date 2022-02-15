@@ -27,6 +27,7 @@ void buildInternalStrings(VM* vm) {
 	vm->internalStrings[INTERNAL_STR_UNDEFINED_VARIABLE_EXCEPTION] = copyString(vm, "UndefinedVariableException", 26);
 	vm->internalStrings[INTERNAL_STR_STACK_OVERFLOW_EXCEPTION] = copyString(vm, "StackOverflowException", 22);
 	vm->internalStrings[INTERNAL_STR_LINK_FAILURE_EXCEPTION] = copyString(vm, "LinkFailureException", 20);
+	vm->internalStrings[INTERNAL_STR_VALUE_EXCEPTION] = copyString(vm, "ValueException", 14);
 
 	vm->internalStrings[INTERNAL_STR_REASON] = copyString(vm, "reason", 6);
 
