@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #ifdef _WIN32
+// Stops MSVC warnings / errors on functions such as 'fopen'
 #include <Windows.h>
 
 #ifdef __cplusplus
@@ -19,10 +20,15 @@
 
 #endif
 
+typedef struct InstanceData {
+	void(*freeData)(struct InstanceData*);
+} InstanceData;
+
 typedef struct VM VM;
 typedef struct Obj Obj;
 typedef struct ObjClass ObjClass;
 typedef struct ObjInstance ObjInstance;
+typedef struct ObjString ObjString;
 
 typedef enum ValueType {
 	VAL_BOOL,
@@ -49,6 +55,7 @@ typedef enum InternalExceptionType {
 	INTERNAL_EXCEPTION_UNDEFINED_VARIABLE,
 	INTERNAL_EXCEPTION_STACK_OVERFLOW,
 	INTERNAL_EXCEPTION_LINK_FAILURE,
+	INTERNAL_EXCEPTION_VALUE,
 	INTERNAL_EXCEPTION__COUNT
 } InternalExceptionType;
 
@@ -72,8 +79,16 @@ ObjClass* (*feline_getInternalException)(VM* vm, InternalExceptionType type);
 void (*feline_throwException)(VM* vm, ObjClass* exceptionType, const char* format, ...);
 bool (*feline_isInstance)(Value value);
 ObjInstance* (*feline_asInstance)(Value value);
+bool (*feline_isString)(Value value);
+ObjString* (*feline_asString)(Value value);
 bool (*feline_getInstanceField)(VM* vm, ObjInstance* instance, const char* name, Value* value);
 bool (*feline_setInstanceField)(VM* vm, ObjInstance* instance, const char* name, Value value);
+char* (*feline_getStringCharacters)(ObjString* string);
+size_t(*feline_getStringLength)(ObjString* string);
+void (*feline_setInstanceNativeData)(ObjInstance* instance, InstanceData* data);
+InstanceData* (*feline_getInstanceNativeData)(ObjInstance* instance);
+
+ObjString* (*feline_takeString)(VM* vm, char* str, size_t length);
 
 #ifdef _WIN32
 HINSTANCE hostFelineApp;
@@ -89,8 +104,15 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
 		feline_throwException = (void (*)(VM*, ObjClass*, const char*, ...))GetProcAddress(hostFelineApp, "throwException");
 		feline_isInstance = (bool (*)(Value))GetProcAddress(hostFelineApp, "export_isInstance");
 		feline_asInstance = (ObjInstance * (*)(Value))GetProcAddress(hostFelineApp, "export_asInstance");
+		feline_isString = (bool (*)(Value))GetProcAddress(hostFelineApp, "export_isString");
+		feline_asString = (ObjString * (*)(Value))GetProcAddress(hostFelineApp, "export_asString");
 		feline_getInstanceField = (bool (*)(VM*, ObjInstance*, const char*, Value*))GetProcAddress(hostFelineApp, "export_getInstanceField");
 		feline_setInstanceField = (bool (*)(VM*, ObjInstance*, const char*, Value))GetProcAddress(hostFelineApp, "export_setInstanceField");
+		feline_getStringCharacters = (char* (*)(ObjString * string))GetProcAddress(hostFelineApp, "export_getStringCharacters");
+		feline_getStringLength = (size_t(*)(ObjString * string))GetProcAddress(hostFelineApp, "export_getStringLength");
+		feline_setInstanceNativeData = (void (*)(ObjInstance * instance, InstanceData * data))GetProcAddress(hostFelineApp, "export_setInstanceNativeData");
+		feline_getInstanceNativeData = (InstanceData * (*)(ObjInstance * instance))GetProcAddress(hostFelineApp, "export_getInstanceNativeData");
+		feline_takeString = (ObjString * (*)(VM * vm, char* str, size_t length))GetProcAddress(hostFelineApp, "takeString");
 	}
 	return TRUE;
 }
