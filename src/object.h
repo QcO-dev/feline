@@ -116,7 +116,7 @@ ObjList* newList(VM* vm, ValueArray items);
 
 ObjNativeLibrary* newNativeLibrary(VM* vm, NativeLibrary library);
 
-ObjString* copyString(VM* vm, const char* str, size_t length);
+FELINE_EXPORT ObjString* copyString(VM* vm, const char* str, size_t length);
 FELINE_EXPORT ObjString* takeString(VM* vm, char* str, size_t length);
 ObjString* makeStringf(VM* vm, const char* format, ...);
 ObjString* makeStringvf(VM* vm, const char* format, va_list vsnargs);
