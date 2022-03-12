@@ -89,6 +89,7 @@ void (*feline_setInstanceNativeData)(ObjInstance* instance, InstanceData* data);
 InstanceData* (*feline_getInstanceNativeData)(ObjInstance* instance);
 
 ObjString* (*feline_takeString)(VM* vm, char* str, size_t length);
+ObjString* (*feline_copyString)(VM* vm, const char* str, size_t length);
 
 #ifdef _WIN32
 HINSTANCE hostFelineApp;
@@ -113,6 +114,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
 		feline_setInstanceNativeData = (void (*)(ObjInstance * instance, InstanceData * data))GetProcAddress(hostFelineApp, "export_setInstanceNativeData");
 		feline_getInstanceNativeData = (InstanceData * (*)(ObjInstance * instance))GetProcAddress(hostFelineApp, "export_getInstanceNativeData");
 		feline_takeString = (ObjString * (*)(VM * vm, char* str, size_t length))GetProcAddress(hostFelineApp, "takeString");
+		feline_copyString = (ObjString * (*)(VM * vm, const char* str, size_t length))GetProcAddress(hostFelineApp, "copyString");
 	}
 	return TRUE;
 }
