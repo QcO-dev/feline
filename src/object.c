@@ -67,6 +67,7 @@ ObjNative* newNative(VM* vm, NativeFunction function, size_t arity) {
 	ObjNative* native = ALLOCATE_OBJ(vm, ObjNative, OBJ_NATIVE);
 	native->function = function;
 	native->arity = arity;
+	native->bound = NULL_VAL;
 	return native;
 }
 
@@ -86,6 +87,7 @@ ObjInstance* newInstance(VM* vm, ObjClass* clazz) {
 	ObjInstance* instance = ALLOCATE_OBJ(vm, ObjInstance, OBJ_INSTANCE);
 	instance->clazz = clazz;
 	initTable(&instance->fields);
+	instance->nativeData = NULL;
 	return instance;
 }
 

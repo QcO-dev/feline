@@ -27,6 +27,7 @@ void buildInternalStrings(VM* vm) {
 	vm->internalStrings[INTERNAL_STR_UNDEFINED_VARIABLE_EXCEPTION] = copyString(vm, "UndefinedVariableException", 26);
 	vm->internalStrings[INTERNAL_STR_STACK_OVERFLOW_EXCEPTION] = copyString(vm, "StackOverflowException", 22);
 	vm->internalStrings[INTERNAL_STR_LINK_FAILURE_EXCEPTION] = copyString(vm, "LinkFailureException", 20);
+	vm->internalStrings[INTERNAL_STR_VALUE_EXCEPTION] = copyString(vm, "ValueException", 14);
 
 	vm->internalStrings[INTERNAL_STR_REASON] = copyString(vm, "reason", 6);
 
@@ -204,6 +205,12 @@ static bool callValue(VM* vm, Value callee, uint8_t argCount) {
 
 				Value initializer;
 				if (tableGet(&clazz->methods, vm->internalStrings[INTERNAL_STR_NEW], &initializer)) {
+					if (IS_NATIVE(initializer)) {
+						ObjNative* native = AS_NATIVE_OBJ(initializer);
+						native->bound = vm->stack.items[vm->stack.length - argCount - 1];
+						return callValue(vm, OBJ_VAL(native), argCount);
+					}
+
 					return callClosure(vm, AS_CLOSURE(initializer), argCount);
 				}
 				else if (argCount != 0) {
@@ -230,7 +237,7 @@ static bool callValue(VM* vm, Value callee, uint8_t argCount) {
 					return false;
 				}
 
-				Value result = native(vm, argCount, &vm->stack.items[vm->stack.length - argCount]);
+				Value result = native(vm, nativeObj->bound, argCount, &vm->stack.items[vm->stack.length - argCount]);
 				vm->stack.length -= (size_t)argCount + 1;
 				
 				push(vm, result);
@@ -286,26 +293,41 @@ static void defineMethod(VM* vm, ObjString* name) {
 	pop(vm);
 }
 
-static bool bindMethod(VM* vm, ObjClass* clazz, ObjString* name) {
+static bool bindMethod(VM* vm, ObjInstance* instance, ObjClass* clazz, ObjString* name) {
 	Value method;
 
 	if (!tableGet(&clazz->methods, name, &method)) {
 		return false;
 	}
 
-	ObjBoundMethod* bound = newBoundMethod(vm, peek(vm, 0), AS_CLOSURE(method));
+	Obj* bound;
+	if (IS_NATIVE(method)) {
+		ObjNative* native = AS_NATIVE_OBJ(method);
+		native->bound = OBJ_VAL(instance);
+		bound = (Obj*)native;
+	}
+	else {
+		bound = (Obj*)newBoundMethod(vm, peek(vm, 0), AS_CLOSURE(method));
+	}
 
 	pop(vm);
 	push(vm, OBJ_VAL(bound));
 	return true;
 }
 
-static bool invokeFromClass(VM* vm, ObjClass* clazz, ObjString* name, uint8_t argCount) {
+static bool invokeFromClass(VM* vm, ObjInstance* instance, ObjClass* clazz, ObjString* name, uint8_t argCount) {
 	Value method;
 	if (!tableGet(&clazz->methods, name, &method)) {
 		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_PROPERTY], "Undefined property '%s'", name->str);
 		return false;
 	}
+
+	if (IS_NATIVE(method)) {
+		ObjNative* native = AS_NATIVE_OBJ(method);
+		native->bound = OBJ_VAL(instance);
+		return callValue(vm, OBJ_VAL(native), argCount);
+	}
+
 	return callClosure(vm, AS_CLOSURE(method), argCount);
 }
 
@@ -325,7 +347,7 @@ static bool invoke(VM* vm, ObjString* name, uint8_t argCount) {
 		return callValue(vm, value, argCount);
 	}
 
-	return invokeFromClass(vm, instance->clazz, name, argCount);
+	return invokeFromClass(vm, instance, instance->clazz, name, argCount);
 }
 
 static bool validateIndex(VM* vm, size_t length, double index, size_t* realIndex) {
@@ -759,7 +781,7 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 					break;
 				}
 
-				if (!bindMethod(vm, instance->clazz, name)) {
+				if (!bindMethod(vm, instance, instance->clazz, name)) {
 					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_PROPERTY], "Undefined property '%s'", name->str);
 					break;
 				}
@@ -797,7 +819,7 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				ObjString* name = READ_STRING();
 				ObjClass* superclass = AS_CLASS(pop(vm));
 
-				if (!bindMethod(vm, superclass, name)) {
+				if (!bindMethod(vm, AS_INSTANCE(vm->stack.items[frame->slotsOffset]), superclass, name)) {
 					break;
 				}
 				break;
@@ -821,7 +843,7 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 
 				ObjClass* superclass = AS_CLASS(pop(vm));
 
-				if (!invokeFromClass(vm, superclass, method, argCount)) {
+				if (!invokeFromClass(vm, AS_INSTANCE(vm->stack.items[frame->slotsOffset]), superclass, method, argCount)) {
 					break;
 				}
 				frame = &vm->frames.items[vm->frames.length - 1];
@@ -858,6 +880,25 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 				}
 
 				push(vm, BOOL_VAL(instanceof(AS_INSTANCE(instance), AS_CLASS(superclass))));
+				break;
+			}
+
+			case OP_CLASS_NATIVE: {
+				ObjClass* clazz = AS_CLASS(peek(vm, 0));
+				ObjString* name = READ_STRING();
+				uint8_t arity = READ_BYTE();
+
+				NativeLibrary library = loadNativeLibrary(vm, makeStringf(vm, "%s%s." NATIVE_LIBRARY_EXT, currentModule->directory->str, currentModule->name->str));
+
+				if (library == NULL) break;
+
+				NativeFunction function = loadNativeFunction(vm, library, makeStringf(vm, "feline_%s_%s", clazz->name->str, name->str));
+
+				if (function == NULL) break;
+
+				ObjNative* native = newNative(vm, function, arity);
+
+				push(vm, OBJ_VAL(native));
 				break;
 			}
 
@@ -923,7 +964,7 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 					}
 
 					pop(vm); // Pop the propertyName off
-					if (!bindMethod(vm, instance->clazz, propertyName)) {
+					if (!bindMethod(vm, instance, instance->clazz, propertyName)) {
 						push(vm, NULL_VAL);
 					}
 				}

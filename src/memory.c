@@ -261,6 +261,11 @@ static void freeObject(VM* vm, Obj* object) {
 		}
 		case OBJ_INSTANCE: {
 			ObjInstance* instance = (ObjInstance*)object;
+
+			if (instance->nativeData != NULL) {
+				instance->nativeData->freeData(instance->nativeData);
+			}
+
 			freeTable(vm, &instance->fields);
 			FREE(vm, ObjInstance, object);
 			break;

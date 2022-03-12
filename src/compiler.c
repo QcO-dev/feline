@@ -1057,6 +1057,32 @@ static void method(Compiler* compiler) {
 	emitOOInstruction(compiler, OP_METHOD, constant);
 }
 
+static void nativeMethod(Compiler* compiler) {
+	consume(compiler, TOKEN_IDENTIFIER, "Expected method name");
+	uint16_t name = identifierConstant(compiler, &compiler->previous);
+
+	consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after function name");
+
+	uint16_t arity = 0;
+	if (!check(compiler, TOKEN_RIGHT_PAREN)) {
+		do {
+			arity++;
+			if (arity > UINT8_MAX) {
+				errorAtCurrent(compiler, "Function cannot have more than 255 parameters");
+			}
+			consume(compiler, TOKEN_IDENTIFIER, "Expected parameter name");
+		} while (match(compiler, TOKEN_COMMA));
+	}
+	consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after parameters");
+
+	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after native function definition");
+
+	emitOOInstruction(compiler, OP_CLASS_NATIVE, name);
+	emitByte(compiler, (uint8_t)arity);
+
+	emitOOInstruction(compiler, OP_METHOD, name);
+}
+
 static void classDeclaration(Compiler* compiler) {
 	consume(compiler, TOKEN_IDENTIFIER, "Expected class name");
 	Token className = compiler->previous;
@@ -1094,7 +1120,12 @@ static void classDeclaration(Compiler* compiler) {
 	consume(compiler, TOKEN_LEFT_BRACE, "Expected '{' before class body");
 
 	while (!check(compiler, TOKEN_RIGHT_BRACE) && !check(compiler, TOKEN_EOF)) {
-		method(compiler);
+		if (match(compiler, TOKEN_NATIVE)) {
+			nativeMethod(compiler);
+		}
+		else {
+			method(compiler);
+		}
 	}
 
 	consume(compiler, TOKEN_RIGHT_BRACE, "Expected '}' after class body");

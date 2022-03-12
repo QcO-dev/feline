@@ -12,8 +12,8 @@ void initModule(VM* vm, Module* mod) {
 	initTable(&mod->globals);
 	initTable(&mod->exports);
 
-	defineNative(vm, mod, "clock", clockNative, 0);
-	defineNative(vm, mod, "len", lenNative, 1);
+	defineNative(vm, &mod->globals, "clock", clockNative, 0);
+	defineNative(vm, &mod->globals, "len", lenNative, 1);
 
 	bindObjectClass(vm, mod);
 	bindImportClass(vm, mod);

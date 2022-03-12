@@ -5,6 +5,7 @@
 #include "chunk.h"
 #include "table.h"
 #include "ffi/ffi.h"
+#include "ffi/felineffi.h"
 #include "module.h"
 
 typedef enum ObjType {
@@ -53,6 +54,7 @@ typedef struct ObjNative {
 	Obj obj;
 	NativeFunction function;
 	size_t arity;
+	Value bound;
 } ObjNative;
 
 typedef struct ObjClass {
@@ -66,6 +68,7 @@ typedef struct ObjInstance {
 	Obj obj;
 	ObjClass* clazz;
 	Table fields;
+	InstanceData* nativeData;
 } ObjInstance;
 
 typedef struct ObjBoundMethod {
@@ -113,8 +116,8 @@ ObjList* newList(VM* vm, ValueArray items);
 
 ObjNativeLibrary* newNativeLibrary(VM* vm, NativeLibrary library);
 
-ObjString* copyString(VM* vm, const char* str, size_t length);
-ObjString* takeString(VM* vm, char* str, size_t length);
+FELINE_EXPORT ObjString* copyString(VM* vm, const char* str, size_t length);
+FELINE_EXPORT ObjString* takeString(VM* vm, char* str, size_t length);
 ObjString* makeStringf(VM* vm, const char* format, ...);
 ObjString* makeStringvf(VM* vm, const char* format, va_list vsnargs);
 
