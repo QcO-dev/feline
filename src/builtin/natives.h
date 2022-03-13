@@ -3,6 +3,7 @@
 #include "../value.h"
 
 void defineNative(VM* vm, Table* table, const char* name, NativeFunction function, size_t arity);
+Value callFromNative(VM* vm, Value value, uint8_t argCount);
 
 Value clockNative(VM* vm, Value bound, uint8_t argCount, Value* args);
 

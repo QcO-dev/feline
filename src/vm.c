@@ -202,7 +202,7 @@ static bool callClosure(VM* vm, ObjClosure* closure, uint8_t argCount) {
 	return true;
 }
 
-static bool callValue(VM* vm, Value callee, uint8_t argCount) {
+bool callValue(VM* vm, Value callee, uint8_t argCount) {
 	if (IS_OBJ(callee)) {
 		switch (OBJ_TYPE(callee)) {
 			case OBJ_CLASS: {
@@ -742,6 +742,11 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 
 				if (vm->frames.length == baseFrameIndex) {
 					pop(vm); // The script function
+
+					if (baseFrameIndex != 0) {
+						push(vm, result);
+					}
+
 					return INTERPRETER_OK;
 				}
 

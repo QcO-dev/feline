@@ -49,3 +49,8 @@ bool valuesEqual(VM* vm, Value a, Value b) {
 		}
 	}
 }
+
+bool isFunction(Value value) {
+	// IS_FUNCTION is not checked because functions are not first class values to the user
+	return IS_CLOSURE(value) || IS_BOUND_METHOD(value) || IS_NATIVE(value);
+}
