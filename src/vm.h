@@ -54,6 +54,8 @@ typedef struct VM {
 	Table nativeLibraries;
 	Table imports;
 
+	Table listMethods;
+
 	Value exception;
 	bool hasException;
 
