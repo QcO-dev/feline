@@ -106,7 +106,7 @@ static void skipWhitespaceBefore(Lexer* lexer) {
 }
 
 static Token string(Lexer* lexer) {
-	while (peek(lexer) != '"' && !isAtEnd(lexer)) {
+	while (!(peek(lexer) == '"' && lexer->current[-1] != '\\') && !isAtEnd(lexer)) {
 		if (peek(lexer) == '\n') lexer->line++;
 		advance(lexer);
 	}
