@@ -507,7 +507,40 @@ static void number(Compiler* compiler, bool canAssign) {
 }
 
 static ObjString* normString(Compiler* compiler, Token strToken) {
-	return copyString(compiler->vm, strToken.start + 1, strToken.length - 2);
+	ByteArray chars;
+
+	initByteArray(&chars);
+
+#define ESCAPE(c, e) case c: writeByteArray(compiler->vm, &chars, e); break
+
+	for (int i = 1; i < strToken.length - 1; i++) {
+		if (strToken.start[i] == '\\') {
+			switch (strToken.start[++i]) {
+				ESCAPE('b', '\b');
+				ESCAPE('f', '\f');
+				ESCAPE('n', '\n');
+				ESCAPE('r', '\r'); 
+				ESCAPE('t', '\t');
+				ESCAPE('v', '\v');
+				ESCAPE('\\', '\\');
+				ESCAPE('\'', '\'');
+				ESCAPE('"', '"');
+				ESCAPE('0', '\0');
+				default: {
+					error(compiler, "Invalid escape sequence");
+				}
+			}
+		}
+		else {
+			writeByteArray(compiler->vm, &chars, strToken.start[i]);
+		}
+	}
+
+#undef ESCAPE
+
+	ObjString* str = copyString(compiler->vm, chars.items, chars.length);
+	freeByteArray(compiler->vm, &chars);
+	return str;
 }
 
 static void string(Compiler* compiler, bool canAssign) {
