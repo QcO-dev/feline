@@ -47,6 +47,9 @@ typedef struct Compiler {
 
 	bool inTryBlock;
 
+	bool isLoop;
+	size_t continueJump;
+
 	// TODO:
 	//   Currently only supports 256 locals in the compiler
 	//   The runtime environment can support up to 2^16
@@ -103,6 +106,7 @@ static void initCompiler(VM* vm, Compiler* compiler, FunctionType type) {
 	compiler->currentClass = NULL;
 	compiler->inTryBlock = false;
 	compiler->function = newFunction(compiler->vm);
+	compiler->isLoop = false;
 
 	if (type != TYPE_SCRIPT) {
 		compiler->function->name = copyString(compiler->vm, compiler->previous.start, compiler->previous.length);
@@ -791,6 +795,12 @@ static void printStatement(Compiler* compiler) {
 	emitByte(compiler, OP_PRINT);
 }
 
+static void continueStatement(Compiler* compiler) {
+	if (!compiler->isLoop) error(compiler, "Use of 'continue' is not permitted outside of loops");
+	emitLoop(compiler, compiler->continueJump);
+	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after continue");
+}
+
 static void exportStatement(Compiler* compiler) {
 	expression(compiler);
 
@@ -826,6 +836,10 @@ static void ifStatement(Compiler* compiler) {
 }
 
 static void forStatement(Compiler* compiler) {
+	bool wasLoop = compiler->isLoop;
+	size_t prevContinueJump = compiler->continueJump;
+	compiler->isLoop = true;
+
 	beginScope(compiler);
 	consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after 'for'");
 	
@@ -865,6 +879,7 @@ static void forStatement(Compiler* compiler) {
 		loopStart = incrementStart;
 		patchJump(compiler, bodyJump);
 	}
+	compiler->continueJump = loopStart;
 
 	statement(compiler);
 
@@ -875,10 +890,18 @@ static void forStatement(Compiler* compiler) {
 	}
 
 	endScope(compiler);
+
+	compiler->isLoop = wasLoop;
+	compiler->continueJump = prevContinueJump;
 }
 
 static void whileStatement(Compiler* compiler) {
+	bool wasLoop = compiler->isLoop;
+	size_t prevContinueJump = compiler->continueJump;
+	compiler->isLoop = true;
+
 	size_t loopStart = currentChunk(compiler)->bytecode.length;
+	compiler->continueJump = loopStart;
 
 	consume(compiler, TOKEN_LEFT_PAREN, "Expected '(' after 'while'");
 	expression(compiler);
@@ -891,6 +914,9 @@ static void whileStatement(Compiler* compiler) {
 	emitLoop(compiler, loopStart);
 
 	patchJump(compiler, exitJump);
+
+	compiler->isLoop = wasLoop;
+	compiler->continueJump = prevContinueJump;
 }
 
 static void returnStatement(Compiler* compiler) {
@@ -989,6 +1015,9 @@ static void blockStatement(Compiler* compiler) {
 static void statement(Compiler* compiler) {
 	if (match(compiler, TOKEN_PRINT)) {
 		printStatement(compiler);
+	}
+	else if (match(compiler, TOKEN_CONTINUE)) {
+		continueStatement(compiler);
 	}
 	else if (match(compiler, TOKEN_EXPORT)) {
 		exportStatement(compiler);
@@ -1317,6 +1346,7 @@ ParseRule rules[] = {
 	[TOKEN_AS] = {NULL, NULL, PREC_NONE},
 	[TOKEN_CATCH] = {NULL, NULL, PREC_NONE},
 	[TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
+	[TOKEN_CONTINUE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
 	[TOKEN_EXPORT] = {NULL, NULL, PREC_NONE},
 	[TOKEN_FALSE] = {literal, NULL, PREC_NONE},
@@ -1342,7 +1372,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(54 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(55 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(FelineTokenType type) {
 	return &rules[type];

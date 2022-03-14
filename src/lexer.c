@@ -138,6 +138,7 @@ static FelineTokenType identifierType(Lexer* lexer) {
 				switch (lexer->start[1]) {
 					case 'a': return checkKeyword(lexer, 2, 3, "tch", TOKEN_CATCH);
 					case 'l': return checkKeyword(lexer, 2, 3, "ass", TOKEN_CLASS);
+					case 'o': return checkKeyword(lexer, 2, 6, "ntinue", TOKEN_CONTINUE);
 				}
 			}
 			break;
