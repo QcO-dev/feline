@@ -9,6 +9,22 @@ void defineNative(VM* vm, Table* table, const char* name, NativeFunction functio
 	pop(vm);
 }
 
+Value callFromNative(VM* vm, Value value, uint8_t argCount) {
+	if (!callValue(vm, value, argCount)) {
+		return NULL_VAL;
+	}
+
+	if (!IS_NATIVE(value)) {
+		executeVM(vm, vm->frames.length - 1);
+	}
+
+	if (vm->hasException) {
+		return NULL_VAL;
+	}
+
+	return pop(vm);
+}
+
 Value clockNative(VM* vm, Value bound, uint8_t argCount, Value* args) {
 	return NUMBER_VAL((double)clock() / 1000);
 }

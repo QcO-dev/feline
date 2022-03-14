@@ -42,5 +42,6 @@ typedef Value(*NativeFunction)(VM* vm, Value bound, uint8_t argCount, Value* val
 bool valuesEqual(VM* vm, Value a, Value b);
 void printValue(VM* vm, Value value);
 bool isFalsey(VM* vm, Value value);
+bool isFunction(Value value);
 
 DECLARE_DYNAMIC_ARRAY(Value, Value)

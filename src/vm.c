@@ -5,6 +5,7 @@
 #include "file.h"
 #include "builtin/objectclass.h"
 #include "builtin/importclass.h"
+#include "builtin/listnatives.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -64,6 +65,8 @@ void initVM(VM* vm) {
 	initTable(&vm->nativeLibraries);
 	initTable(&vm->imports);
 
+	initTable(&vm->listMethods);
+
 	// Forces the stack to resize before anything else is allocated
 	// Allows for push() and pop() to be used to stop values being GC'd.
 	push(vm, NULL_VAL);
@@ -75,6 +78,8 @@ void initVM(VM* vm) {
 	defineImportClass(vm);
 
 	defineExceptionClasses(vm);
+
+	defineListNativeMethods(vm);
 }
 
 void freeVM(VM* vm) {
@@ -89,6 +94,7 @@ void freeVM(VM* vm) {
 	freeTable(vm, &vm->strings);
 	freeTable(vm, &vm->nativeLibraries);
 	freeTable(vm, &vm->imports);
+	freeTable(vm, &vm->listMethods);
 	freeValueArray(vm, &vm->stack);
 	freeCallFrameArray(vm, &vm->frames);
 	freeObjects(vm);
@@ -196,7 +202,7 @@ static bool callClosure(VM* vm, ObjClosure* closure, uint8_t argCount) {
 	return true;
 }
 
-static bool callValue(VM* vm, Value callee, uint8_t argCount) {
+bool callValue(VM* vm, Value callee, uint8_t argCount) {
 	if (IS_OBJ(callee)) {
 		switch (OBJ_TYPE(callee)) {
 			case OBJ_CLASS: {
@@ -331,8 +337,22 @@ static bool invokeFromClass(VM* vm, ObjInstance* instance, ObjClass* clazz, ObjS
 	return callClosure(vm, AS_CLOSURE(method), argCount);
 }
 
+static inline bool invokePrimitiveType(VM* vm, Value receiver, ObjString* name, uint8_t argCount, Table* methods) {
+	Value method;
+	if (!tableGet(&vm->listMethods, name, &method)) {
+		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_PROPERTY], "Undefined method '%s'", name->str);
+		return false;
+	}
+	ASSERT(IS_NATIVE(method), "All primitive methods should be native");
+	ObjNative* native = AS_NATIVE_OBJ(method);
+	native->bound = receiver;
+	return callValue(vm, method, argCount);
+}
+
 static bool invoke(VM* vm, ObjString* name, uint8_t argCount) {
 	Value receiver = peek(vm, argCount);
+
+	if (IS_LIST(receiver)) return invokePrimitiveType(vm, receiver, name, argCount, &vm->listMethods);
 
 	if (!IS_INSTANCE(receiver)) {
 		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Only instances have methods");
@@ -348,6 +368,19 @@ static bool invoke(VM* vm, ObjString* name, uint8_t argCount) {
 	}
 
 	return invokeFromClass(vm, instance, instance->clazz, name, argCount);
+}
+
+static bool accessPropertyPrimitive(VM* vm, Value receiver, ObjString* name, Table* table) {
+	Value value;
+	if (!tableGet(table, name, &value)) {
+		throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_PROPERTY], "Undefined property '%s'", name->str);
+		return false;
+	}
+	ASSERT(IS_NATIVE(value), "All primitive methods should be native");
+	ObjNative* native = AS_NATIVE_OBJ(value);
+	native->bound = receiver;
+	push(vm, value);
+	return true;
 }
 
 static bool validateIndex(VM* vm, size_t length, double index, size_t* realIndex) {
@@ -709,6 +742,11 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 
 				if (vm->frames.length == baseFrameIndex) {
 					pop(vm); // The script function
+
+					if (baseFrameIndex != 0) {
+						push(vm, result);
+					}
+
 					return INTERPRETER_OK;
 				}
 
@@ -766,13 +804,20 @@ InterpreterResult executeVM(VM* vm, size_t baseFrameIndex) {
 			}
 
 			case OP_ACCESS_PROPERTY: {
+				ObjString* name = READ_STRING();
+
+				if (IS_LIST(peek(vm, 0))) {
+					Value list = pop(vm);
+					accessPropertyPrimitive(vm, list, name, &vm->listMethods);
+					break;
+				}
+
 				if (!IS_INSTANCE(peek(vm, 0))) {
 					throwException(vm, vm->internalExceptions[INTERNAL_EXCEPTION_TYPE], "Only instances have properties");
 					break;
 				}
 
 				ObjInstance* instance = AS_INSTANCE(peek(vm, 0));
-				ObjString* name = READ_STRING();
 
 				Value value;
 				if (tableGet(&instance->fields, name, &value)) {

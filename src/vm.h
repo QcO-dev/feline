@@ -54,6 +54,8 @@ typedef struct VM {
 	Table nativeLibraries;
 	Table imports;
 
+	Table listMethods;
+
 	Value exception;
 	bool hasException;
 
@@ -89,6 +91,7 @@ void push(VM* vm, Value value);
 Value peek(VM* vm, size_t distance);
 Value pop(VM* vm);
 FELINE_EXPORT void throwException(VM* vm, ObjClass* exceptionType, const char* format, ...);
+bool callValue(VM* vm, Value callee, uint8_t argCount);
 
 void inheritClasses(VM* vm, ObjClass* subclass, ObjClass* superclass);
 
