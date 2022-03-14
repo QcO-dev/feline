@@ -49,6 +49,7 @@ typedef struct Compiler {
 
 	bool isLoop;
 	size_t continueJump;
+	size_t breakJump;
 
 	// TODO:
 	//   Currently only supports 256 locals in the compiler
@@ -795,6 +796,13 @@ static void printStatement(Compiler* compiler) {
 	emitByte(compiler, OP_PRINT);
 }
 
+static void breakStatement(Compiler* compiler) {
+	if (!compiler->isLoop) error(compiler, "Use of 'break' is not permitted outside of loops");
+	emitByte(compiler, OP_FALSE);
+	emitLoop(compiler, compiler->breakJump - 1);
+	consume(compiler, TOKEN_SEMICOLON, "Expected ';' after break");
+}
+
 static void continueStatement(Compiler* compiler) {
 	if (!compiler->isLoop) error(compiler, "Use of 'continue' is not permitted outside of loops");
 	emitLoop(compiler, compiler->continueJump);
@@ -838,6 +846,7 @@ static void ifStatement(Compiler* compiler) {
 static void forStatement(Compiler* compiler) {
 	bool wasLoop = compiler->isLoop;
 	size_t prevContinueJump = compiler->continueJump;
+	size_t prevBreakJump = compiler->breakJump;
 	compiler->isLoop = true;
 
 	beginScope(compiler);
@@ -855,12 +864,18 @@ static void forStatement(Compiler* compiler) {
 
 	size_t loopStart = currentChunk(compiler)->bytecode.length;
 
-	int64_t exitJump = -1;
+	int64_t exitJump;
 	if (!match(compiler, TOKEN_SEMICOLON)) {
 		expression(compiler);
 		consume(compiler, TOKEN_SEMICOLON, "Expected ';' after for condition");
 
 		exitJump = emitJump(compiler, OP_JUMP_FALSE);
+		compiler->breakJump = exitJump;
+	}
+	else {
+		emitByte(compiler, OP_TRUE);
+		exitJump = emitJump(compiler, OP_JUMP_FALSE);
+		compiler->breakJump = exitJump;
 	}
 
 	if (!match(compiler, TOKEN_RIGHT_PAREN)) {
@@ -885,19 +900,19 @@ static void forStatement(Compiler* compiler) {
 
 	emitLoop(compiler, loopStart);
 
-	if (exitJump != -1) {
-		patchJump(compiler, exitJump);
-	}
+	patchJump(compiler, exitJump);
 
 	endScope(compiler);
 
 	compiler->isLoop = wasLoop;
 	compiler->continueJump = prevContinueJump;
+	compiler->breakJump = prevBreakJump;
 }
 
 static void whileStatement(Compiler* compiler) {
 	bool wasLoop = compiler->isLoop;
 	size_t prevContinueJump = compiler->continueJump;
+	size_t prevBreakJump = compiler->breakJump;
 	compiler->isLoop = true;
 
 	size_t loopStart = currentChunk(compiler)->bytecode.length;
@@ -908,6 +923,7 @@ static void whileStatement(Compiler* compiler) {
 	consume(compiler, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
 
 	size_t exitJump = emitJump(compiler, OP_JUMP_FALSE);
+	compiler->breakJump = exitJump;
 	
 	statement(compiler);
 
@@ -917,6 +933,7 @@ static void whileStatement(Compiler* compiler) {
 
 	compiler->isLoop = wasLoop;
 	compiler->continueJump = prevContinueJump;
+	compiler->breakJump = prevBreakJump;
 }
 
 static void returnStatement(Compiler* compiler) {
@@ -1015,6 +1032,9 @@ static void blockStatement(Compiler* compiler) {
 static void statement(Compiler* compiler) {
 	if (match(compiler, TOKEN_PRINT)) {
 		printStatement(compiler);
+	}
+	else if (match(compiler, TOKEN_BREAK)) {
+		breakStatement(compiler);
 	}
 	else if (match(compiler, TOKEN_CONTINUE)) {
 		continueStatement(compiler);
@@ -1372,7 +1392,7 @@ ParseRule rules[] = {
 	[TOKEN_EOF] = {NULL, NULL, PREC_NONE}
 };
 
-static_assert(55 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
+static_assert(56 == TOKEN__COUNT, "Handling of tokens in rules[] does not handle all tokens exactly once");
 
 static ParseRule* getRule(FelineTokenType type) {
 	return &rules[type];

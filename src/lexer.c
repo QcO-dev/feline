@@ -133,6 +133,7 @@ static Token number(Lexer* lexer) {
 static FelineTokenType identifierType(Lexer* lexer) {
 	switch (lexer->start[0]) {
 		case 'a': return checkKeyword(lexer, 1, 1, "s", TOKEN_AS);
+		case 'b': return checkKeyword(lexer, 1, 4, "reak", TOKEN_BREAK);
 		case 'c': {
 			if (lexer->current - lexer->start > 1) {
 				switch (lexer->start[1]) {
